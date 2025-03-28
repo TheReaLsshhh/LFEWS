@@ -1,0 +1,237 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+    <style>
+    /* Sidebar Styles */
+    .sidebar {
+        width: 220px;
+        background-color:rgb(0, 0, 0);
+        padding: 20px;
+        position: fixed;
+        height: 100vh;
+        left: 0;
+        top: 0;
+        overflow-y: auto;
+        transition: all 0.3s ease;
+    }
+
+    /* Hamburger menu icon */
+    .menu-toggle {
+        display: none;
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 1000;
+        cursor: pointer;
+        background: none;
+        border: none;
+        color: #76e095;
+        font-size: 24px;
+    }
+
+    /* Add logo styles */
+    .sidebar-logo {
+        width: 180px;  /* Adjusted to fit sidebar width */
+        height: auto;
+        display: block;
+        margin: 0 auto 20px;  /* Center logo and add space below */
+        padding-top: -5px;    /* Add space at the top */
+    }
+
+    /* Adjust h2 positioning after logo */
+    .sidebar h2 {
+        color: #76e095;
+        text-align: center;
+        margin-bottom: 10px;
+        font-size: 24px;
+        margin-top: 10px;  /* Reduced from 50px since we have logo now */
+    }
+
+    /* Add specific style for the second h2 */
+    .sidebar h2:last-of-type {
+        margin-top: -5px;     /* Negative margin to pull up */
+        margin-bottom: 25px;  /* Space after LFEWS before menu items */
+    }
+
+    /* Sidebar menu styles */
+    .sidebar ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .sidebar ul li {
+        margin: 15px 0;
+    }
+
+    .sidebar ul li a {
+        color: #e0e0e0;
+        text-decoration: none;
+        display: block;
+        padding: 8px 10px;
+        border-radius: 4px;
+        transition: all 0.3s ease;
+    }
+
+    .sidebar ul li a:hover {
+        background-color: rgba(118, 224, 149, 0.1);
+        color: #76e095;
+    }
+
+    /* Submenu styles */
+    .submenu {
+        display: none;
+        margin-left: 20px;
+        font-size: 11px;
+    }
+
+    .submenu.active {
+        display: block;
+    }
+
+    .submenu li {
+        margin: 8px 0 !important;
+    }
+
+    /* Active state */
+    .sidebar ul li.active > a {
+        color: #76e095;
+        background-color: rgba(118, 224, 149, 0.1);
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .menu-toggle {
+            display: block;
+        }
+
+        .sidebar {
+            transform: translateX(-100%);
+            z-index: 999;
+        }
+
+        .sidebar.active {
+            transform: translateX(0);
+        }
+
+        .main {
+            margin-left: 0 !important;
+            width: 100% !important;
+        }
+    }
+    </style>
+
+</head>
+<body>
+<!-- Add hamburger menu button -->
+<button class="menu-toggle">☰</button>
+
+<!-- Update sidebar HTML -->
+<div class="sidebar">
+    <img src="{% static 'images/com.png' %}" alt="Logo" class="sidebar-logo">
+    <h2>L F E W S</h2>
+    <ul>
+        <li>
+            <a href="#" class="menu-item">Water Levels</a>
+            <ul class="submenu">
+                <li><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                <li><a href="{% url 'bayawan_view' %}">Bayawan Bridge</a></li>
+                <li><a href="{% url 'canalum_view' %}">Canalum Creek</a></li>
+                <li><a href="{% url 'kalumbuyan_view' %}">Kalumbuyan Bridge</a></li>
+                <li><a href="{% url 'jugno_view' %}">Jugno Creek</a></li>
+            </ul>
+        </li>
+        <li>
+            <a href="#" class="menu-item">Weather Updates</a>
+            <ul class="submenu">
+                <li><a href="#">Location 1</a></li>
+                <li><a href="#">Location 2</a></li>
+                <li><a href="#">Location 3</a></li>
+                <li><a href="#">Location 4</a></li>
+            </ul>
+        </li>
+        <li>
+            <a href="#" class="menu-item">Heat Index</a>
+            <ul class="submenu">
+                <li><a href="#">Location 1</a></li>
+                <li><a href="#">Location 2</a></li>
+                <li><a href="#">Location 3</a></li>
+                <li><a href="#">Location 4</a></li>
+            </ul>
+        </li>
+        <li><a href="{% url 'report_view' %}">Reports</a></li>
+    </ul>
+</div>
+    
+<script>
+    $(document).ready(function() {
+        // Check if a menu was previously open and restore that state
+        const activeMenu = localStorage.getItem('activeMenu');
+        if (activeMenu) {
+            const $menuItem = $(`.menu-item:contains("${activeMenu}")`);
+            const $parent = $menuItem.parent();
+            const $submenu = $parent.find('.submenu');
+            
+            if ($submenu.length) {
+                $submenu.show();
+                $parent.addClass('active');
+            }
+        }
+        
+        // Toggle submenu
+        $('.menu-item').click(function(e) {
+            e.preventDefault();
+            const $parent = $(this).parent();
+            const $submenu = $parent.find('.submenu');
+            const menuText = $(this).text();
+            
+            // Close all other submenus
+            $('.submenu').not($submenu).slideUp(300);
+            $('.menu-item').parent().not($parent).removeClass('active');
+            
+            if ($submenu.length) {
+                $submenu.slideToggle(300);
+                $parent.toggleClass('active');
+                
+                // Store the active menu in localStorage if it's active, or remove if toggled off
+                if ($parent.hasClass('active')) {
+                    localStorage.setItem('activeMenu', menuText);
+                } else {
+                    localStorage.removeItem('activeMenu');
+                }
+            }
+        });
+
+        // Make submenu links work without closing the menu
+        $('.submenu a').click(function(e) {
+            e.stopPropagation(); // Prevent the click from bubbling up to parent elements
+        });
+
+        // Toggle sidebar on mobile
+        $('.menu-toggle').click(function() {
+            $('.sidebar').toggleClass('active');
+        });
+
+        // Close sidebar when clicking outside on mobile
+        $(document).click(function(e) {
+            if ($(window).width() <= 768) {
+                if (!$(e.target).closest('.sidebar, .menu-toggle').length) {
+                    $('.sidebar').removeClass('active');
+                }
+            }
+        });
+
+        // Handle window resize
+        $(window).resize(function() {
+            if ($(window).width() > 768) {
+                $('.sidebar').removeClass('active');
+            }
+        });
+    });
+</script>
+
+</body>
+</html>

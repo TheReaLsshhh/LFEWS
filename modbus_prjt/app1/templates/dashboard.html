@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modbus Data Dashboard</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: #1b1b1b;
+            color: white;
+        }
+
+        .sidebar {
+            width: 220px;
+            background-color: rgb(0, 0, 0);
+            padding: 20px;
+            position: fixed;
+            height: 100vh;
+            left: 0;
+            top: 0;
+            overflow-y: auto;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .main {
+            flex: 1;
+            margin-left: 220px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            width: calc(100% - 220px);
+            min-width: 0;
+            overflow-x: auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .banner {
+            width: 1500px;
+            max-height: 140px;
+            text-align: center;
+            margin-top: -10px;
+        }
+
+        .banner img {
+            width: 100%;
+            max-height: 140px;
+            object-fit: contain;
+        }
+
+        .header {
+            background-color: #141414;
+            width: 100%;
+            padding: 12px 20px;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            border-bottom: 2px solid #76e095;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            margin-top: -15px;
+            margin-bottom: -10px;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 10px;
+            padding: 10px;
+            width: 100%;
+            height: calc(100vh - 140px);
+            margin-top: 30px;
+        }
+
+        .graph {
+            width: 100%;
+            height: 270px;
+            padding: 10px;
+            position: relative;
+        }
+
+        /* Add historical container styles */
+        .historical-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 10px;
+            padding: 10px;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        /* Add a container for both current and historical graphs */
+        .graphs-wrapper {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Update legend styles with glassmorphism effect */
+        .legend-container {
+            position: absolute;
+            top: 30px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            padding: 8px;
+            font-size: 10px;
+            z-index: 1000;
+            pointer-events: none; /* This ensures clicks pass through to the graph */
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 3px 0;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            margin-right: 5px;
+            border-radius: 2px;
+        }
+
+        .date-picker-container {
+            position: relative;
+            bottom: 10px;
+            left: 110%;
+            transform: translateX(-60%);
+            padding: 10px;
+            border-radius: 4px;
+            z-index: 1000;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #start-date,
+        #end-date {
+            background-color: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        #update-graphs {
+            background-color: #76e095;
+            color: black;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #update-graphs:hover {
+            background-color: #5bc278;
+        }
+
+        #date-selector {
+            background-color: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        #clear-graphs {
+            background-color: #e07695;
+            color: black;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #clear-graphs:hover {
+            background-color: #c25278;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Include Sidebar -->
+    {% include 'sidebar.html' %}
+
+    <!-- Main Content -->
+    <div class="main">
+        <!-- Banner Above Header -->
+        <div class="banner">
+            {% load static %}
+            <img src="{% static 'images/banner.png' %}" alt="Banner">
+        </div>
+
+        <div class="header">Water Level Dashboard</div>
+
+        <div class="graphs-wrapper">
+            <!-- Current Graphs -->
+            <div class="content">
+                <div class="graph">
+                    <div id="graph1"></div>
+                    <div class="legend-container">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: gray"></div>0.00
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: green"></div>0.01 - 90.99
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: yellow"></div>91.00 - 120.99
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: orange"></div>121.00 - 169.99
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: red"></div>170.00 +
+                        </div>
+                    </div>
+                </div>
+                <div class="graph">
+                    <div id="graph2"></div>
+                    <div class="legend-container">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: gray"></div>0.00
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: green"></div>0.01 - 269.99
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: yellow"></div>270.00 - 369.99
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: orange"></div>370.00 - 435.99
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: red"></div>436.00 +
+                        </div>
+                    </div>
+                </div>
+                <div class="graph">
+                    <div id="graph3"></div>
+                    <div class="legend-container">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: gray"></div>0.00
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: green"></div>0.01 - 77.59
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: yellow"></div>77.60 - 124.99
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: orange"></div>125.00 - 169.99
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: red"></div>170.00 +
+                        </div>
+                    </div>
+                </div>
+                <div class="graph">
+                    <div id="graph4"></div>
+                    <div class="legend-container">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: gray"></div>0.00
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: green"></div>0.01 - 209.99
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: yellow"></div>210.00 - 309.99
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: orange"></div>310.00 - 409.99
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: red"></div>410.00 +
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="date-picker-container">
+                        <label for="start-date">Start Date: </label>
+                        <input type="date" id="start-date">
+                        <label for="end-date">End Date: </label>
+                        <input type="date" id="end-date">
+                        <button id="update-graphs">Generate</button>
+                        <button id="clear-graphs">Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Historical Graphs -->
+            <div class="historical-container">
+                <div class="graph">
+                    <div id="graph6"></div>
+                </div>
+                <div class="graph">
+                    <div id="graph7"></div>
+                </div>
+                <div class="graph">
+                    <div id="graph8"></div>
+                </div>
+                <div class="graph">
+                    <div id="graph9"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function getColor(value, thresholds) {
+            if (value === 0) return 'gray';
+            for (let t of thresholds) {
+                if (value <= t.max) return t.color;
+            }
+            return 'red';
+        }
+        
+        function refreshGraphs(startDate = null, endDate = null) {
+            // First, get current data for the top graphs (always show current data)
+            let currentUrl = "{% url 'dashboard' %}?ajax=1";
+            
+            $.getJSON(currentUrl, function(currentData) {
+                const thresholds = {
+                    graph1: [
+                        { max: 90.99, color: 'green' },
+                        { max: 120.99, color: 'yellow' },
+                        { max: 169.99, color: 'orange' }
+                    ],
+                    graph2: [
+                        { max: 269.99, color: 'green' },
+                        { max: 369.99, color: 'yellow' },
+                        { max: 435.99, color: 'orange' }
+                    ],
+                    graph3: [
+                        { max: 77.59, color: 'green' },
+                        { max: 124.99, color: 'yellow' },
+                        { max: 169.99, color: 'orange' }
+                    ],
+                    graph4: [
+                        { max: 209.99, color: 'green' },
+                        { max: 309.99, color: 'yellow' },
+                        { max: 409.99, color: 'orange' }
+                    ]
+                };
+                
+                // Create traces with the current data for top graphs
+                updateGraph("graph1", currentData.bywntest, thresholds.graph1, "Bayawan Bridge");
+                updateGraph("graph2", currentData.canalumtest, thresholds.graph2, "Canalum Creek");
+                updateGraph("graph3", currentData.kalumbuyantest, thresholds.graph3, "Kalumbuyan Bridge");
+                updateGraph("graph4", currentData.jugnotest, thresholds.graph4, "Jugno Creek");
+                
+                // If date range is provided, get historical data for bottom graphs
+                if (startDate && endDate) {
+                    let historicalUrl = `{% url 'dashboard' %}?ajax=1&start_date=${startDate}&end_date=${endDate}`;
+                    
+                    $.getJSON(historicalUrl, function(historicalData) {
+                        updateGraph("graph6", historicalData.bywntest, thresholds.graph1, "Historical Bayawan Bridge");
+                        updateGraph("graph7", historicalData.canalumtest, thresholds.graph2, "Historical Canalum Creek");
+                        updateGraph("graph8", historicalData.kalumbuyantest, thresholds.graph3, "Historical Kalumbuyan Bridge");
+                        updateGraph("graph9", historicalData.jugnotest, thresholds.graph4, "Historical Jugno Creek");
+                    }).fail(function() {
+                        console.error("Error fetching historical data.");
+                    });
+                }
+                
+                console.log("Graphs updated successfully.");
+            }).fail(function() {
+                console.error("Error refreshing graph data.");
+            });
+        }
+        
+        function updateGraph(graphId, data, thresholds, title) {
+            // Create a default layout first
+            const layout = createLayout(title, graphId);
+            
+            // Check if data is valid
+            if (!data || !data.values || data.values.length === 0 || (data.values.length === 1 && data.values[0] === 0 && data.dates[0] === "No Data")) {
+                // No data available - show empty graph with "No Data" message
+                Plotly.newPlot(graphId, [{
+                    x: [],
+                    y: [],
+                    type: 'scatter',
+                    mode: 'lines+markers'
+                }], {
+                    ...layout,
+                    annotations: [{
+                        text: 'No Data Available',
+                        showarrow: false,
+                        font: { color: 'white', size: 16 },
+                        x: 0.5,
+                        y: 0.5,
+                        xref: 'paper',
+                        yref: 'paper'
+                    }]
+                });
+                return;
+            }
+            
+            // Parse values to numbers
+            const values = data.values.map(v => parseFloat(v));
+            const dates = data.dates;
+            
+            // Get the color for each data point
+            const colors = values.map(v => getColor(v, thresholds));
+            
+            // Create a trace for each data point with its own color
+            const traces = [];
+            
+            for (let i = 0; i < values.length; i++) {
+                const value = values[i];
+                const color = getColor(value, thresholds);
+                const fillColor = getFillColor(color);
+                
+                traces.push({
+                    x: [dates[i]],
+                    y: [value.toFixed(2)],
+                    mode: 'markers',
+                    marker: {
+                        size: 8,
+                        color: color
+                    },
+                    showlegend: false,
+                    hoverinfo: 'x+y'
+                });
+                
+                // Add a line segment if this isn't the first point
+                if (i > 0) {
+                    traces.push({
+                        x: [dates[i-1], dates[i]],
+                        y: [values[i-1].toFixed(2), value.toFixed(2)],
+                        mode: 'lines',
+                        line: {
+                            color: color,
+                            width: 2
+                        },
+                        fill: 'tozeroy',
+                        fillcolor: fillColor,
+                        showlegend: false,
+                        hoverinfo: 'none'
+                    });
+                }
+            }
+            
+            // Set the xaxis range to show only the last 15 points by default
+            if (dates.length > 15) {
+                layout.xaxis.range = [
+                    dates[dates.length - 15],
+                    dates[dates.length - 1]
+                ];
+                layout.xaxis.autorange = false;
+            }
+            
+            // Plot the graph
+            Plotly.newPlot(graphId, traces, layout, {
+                displayModeBar: true,
+                modeBarButtonsToRemove: [
+                    'pan2d',
+                    'select2d',
+                    'lasso2d',
+                    'resetScale2d',
+                    'toImage',
+                    'autoScale2d',
+                    'hoverClosestCartesian',
+                    'hoverCompareCartesian'
+                ],
+                displaylogo: false
+            });
+        }
+        
+        function getFillColor(color) {
+            switch(color) {
+                case 'gray': return 'rgba(128, 128, 128, 0.3)';
+                case 'green': return 'rgba(0, 128, 0, 0.3)';
+                case 'yellow': return 'rgba(255, 255, 0, 0.3)';
+                case 'orange': return 'rgba(255, 165, 0, 0.3)';
+                case 'red': return 'rgba(255, 0, 0, 0.3)';
+                default: return 'rgba(128, 128, 128, 0.1)';
+            }
+        }
+        
+        function createLayout(title, graphId) {
+            // Determine if this is a historical graph
+            const isHistorical = graphId.startsWith('graph6') || 
+                                graphId.startsWith('graph7') || 
+                                graphId.startsWith('graph8') || 
+                                graphId.startsWith('graph9');
+            
+            // Set y-axis range based on graph ID
+            let yRange;
+            if (graphId === 'graph1' || graphId === 'graph3' || graphId === 'graph6' || graphId === 'graph8') {
+                yRange = [0, 200]; // Bayawan and Kalumbuyan
+            } else {
+                yRange = [0, 500]; // Canalum and Jugno
+            }
+            
+            return {
+                width: 600,
+                height: 260,
+                title: {
+                    text: title,
+                    font: { size: 14, color: 'white' },
+                    y: 0.95
+                },
+                xaxis: {
+                    type: 'date',
+                    tickfont: { color: 'white', size: 9 }
+                },
+                yaxis: {
+                    range: yRange,
+                    tickformat: ".2f",
+                    tickfont: { color: 'white', size: 7 },
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    gridwidth: 1
+                },
+                margin: { l: 40, r: 20, t: 30, b: 40 },
+                paper_bgcolor: 'black',
+                plot_bgcolor: 'black',
+                font: { color: 'white' },
+                showlegend: false,
+                hovermode: 'far'
+            };
+        }
+        
+        // Initial load and periodic refresh
+        $(document).ready(function() {
+            // Hide historical graphs container when page loads
+            $('.historical-container').hide();
+            
+            // Initial load of graphs
+            refreshGraphs();
+            
+            // Set up periodic refresh
+            setInterval(() => {
+                // Only refresh current data graphs automatically
+                refreshGraphs();
+            }, 60000); // Refresh every minute
+        });
+
+        $('#update-graphs').on('click', function() {
+            const startDate = $('#start-date').val();
+            const endDate = $('#end-date').val();
+            
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates');
+                return;
+            }
+            
+            if (new Date(endDate) < new Date(startDate)) {
+                alert('End date must be after start date');
+                return;
+            }
+            
+            // Show historical graphs container if it was hidden
+            $('.historical-container').show();
+            
+            refreshGraphs(startDate, endDate);
+        });
+
+        $('#clear-graphs').on('click', function() {
+            // Clear date inputs
+            $('#start-date').val('');
+            $('#end-date').val('');
+            
+            // Hide historical graphs
+            $('.historical-container').hide();
+            
+            // Refresh only the current graphs
+            refreshGraphs();
+        });
+
+    </script>
+
+</body>
+
+</html>
