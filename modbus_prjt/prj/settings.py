@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+import os
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -40,6 +42,7 @@ INSTALLED_APPS = [
     'app1',
     'django_celery_beat',
     'rest_framework',
+    "rest_framework_api_key",
 ]
 
 MIDDLEWARE = [
@@ -140,16 +143,19 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 # Celery Beat configuration
 CELERY_BEAT_SCHEDULE = {
-    'store-modbus_project-data-every-60-seconds': {
+    'store-modbus-data': {
         'task': 'app1.tasks.store_modbus_data',
         'schedule': 60.0,  # every 60 seconds
     },
+    'fetch-weather-data': {
+        'task': 'app1.tasks.fetch_all_weather_data',
+        'schedule': 60.0,  # every 60 seconds
+    }
 }
 
 # Configure time zone
 TIME_ZONE = 'UTC'  # or your desired timezone
 USE_TZ = True
-
 
 
 LOGGING = {
@@ -164,4 +170,15 @@ LOGGING = {
         'handlers': ['console'],
         'level': 'INFO',
     },
+}
+
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+
+# settings.py
+METNO_USER_AGENT = 'LFEWS/1.0 suportalfews@gmail.com'
+
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework_api_key.permissions.HasAPIKey",
+    ]
 }
