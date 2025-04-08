@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bayawan Bridge Water Level</title>
+    <title>Canalum Creek Water Level</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
@@ -30,7 +30,7 @@
             height: 100vh;
             left: 0;
             top: 0;
-            overflow-y: auto;
+            overflow-y: hiddens;
             transition: all 0.3s ease;
             z-index: 1000;
         }
@@ -50,7 +50,7 @@
         }
 
         .banner {
-            width: 1500px;
+            width: 100% ;
             max-height: 140px;
             text-align: center;
             margin-top: -10px;
@@ -220,7 +220,7 @@
         /* Add styles for historical graph container */
         .historical-graph-container {
             width: 90%;
-            height: 500px;
+            height: 600px;
             background-color: transparent;
             border-radius: 8px;
             padding: 20px;
@@ -243,7 +243,7 @@
             <img src="{% static 'images/banner.png' %}" alt="Banner">
         </div>
 
-        <div class="header">Bayawan Bridge Water Level</div>
+        <div class="header">Canalum Creek Water Level</div>
 
         <div class="date-picker-container">
             <label for="start-date">Start Date: </label>
@@ -260,13 +260,13 @@
                     <div class="legend-color" style="background: gray"></div>0.00 cm (No Data)
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: green"></div>0.01 - 90.99 cm (Normal)
+                    <div class="legend-color" style="background: green"></div>0.01 - 77.59 cm (Normal)
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: yellow"></div>91.00 - 120.99 cm (Alert)
+                    <div class="legend-color" style="background: yellow"></div>77.60 - 124.99 cm (Alert)
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: orange"></div>121.00 - 169.99 cm (Warning)
+                    <div class="legend-color" style="background: orange"></div>125.00 - 169.99 cm (Warning)
                 </div>
                 <div class="legend-item">
                     <div class="legend-color" style="background: red"></div>170.00 cm + (Critical)
@@ -299,8 +299,8 @@
     <script>
         function getColor(value) {
             if (value === 0) return 'gray';
-            if (value <= 90.99) return 'green';
-            if (value <= 120.99) return 'yellow';
+            if (value <= 77.59) return 'green';
+            if (value <= 124.99) return 'yellow';
             if (value <= 169.99) return 'orange';
             return 'red';
         }
@@ -321,6 +321,10 @@
             const isDarkTheme = !$('#theme-toggle').is(':checked');
             const hoverTextColor = isDarkTheme ? 'white' : 'black';
             
+            // Calculate the time range for last 30 minutes
+            const now = new Date();
+            const thirtyMinutesAgo = new Date(now.getTime() - (30 * 60 * 1000));
+            
             if (startDate && endDate) {
                 url += `&start_date=${startDate}&end_date=${endDate}`;
             }
@@ -335,7 +339,31 @@
                         y: [],
                         type: 'scatter',
                         mode: 'lines+markers'
-                    }], createLayout(isDarkTheme));
+                    }], createLayout());
+                    return;
+                }
+                
+                // Special case: If there's exactly one data point with value 0 and date "No Data",
+                // we'll still display it as a zero reading rather than "No Data"
+                const isZeroNoDataPoint = bayawanData.values.length === 1 && 
+                                         parseFloat(bayawanData.values[0]) === 0 && 
+                                         bayawanData.dates[0] === "No Data";
+                
+                if (isZeroNoDataPoint) {
+                    // Display zero data with current date/time instead of "No Data"
+                    const currentDate = new Date().toLocaleString();
+                    
+                    Plotly.newPlot('bayawan-graph', [{
+                        x: [currentDate],
+                        y: [0],
+                        type: 'scatter',
+                        mode: 'markers',
+                        marker: {
+                            size: 10,
+                            color: 'gray'
+                        },
+                        hovertemplate: '0.00 cm<br>%{x}<extra></extra>'
+                    }], createLayout());
                     return;
                 }
                 
@@ -343,16 +371,20 @@
                 const values = bayawanData.values.map(v => parseFloat(v));
                 const dates = bayawanData.dates;
                 
+                // Use all available points
+                const finalValues = values;
+                const finalDates = dates;
+                
                 // Create a trace for each data point with its own color
                 const traces = [];
                 
-                for (let i = 0; i < values.length; i++) {
-                    const value = values[i];
+                for (let i = 0; i < finalValues.length; i++) {
+                    const value = finalValues[i];
                     const color = getColor(value);
                     const fillColor = getFillColor(color);
                     
                     traces.push({
-                        x: [dates[i]],
+                        x: [finalDates[i]],
                         y: [value.toFixed(2)],
                         mode: 'markers',
                         marker: {
@@ -364,7 +396,9 @@
                         hoverlabel: {
                             font: {
                                 color: hoverTextColor
-                            }
+                            },
+                            bgcolor: color,
+                            bordercolor: color
                         },
                         hovertemplate: '%{y} cm<br>%{x}<extra></extra>'
                     });
@@ -372,8 +406,8 @@
                     // Add a line segment if this isn't the first point
                     if (i > 0) {
                         traces.push({
-                            x: [dates[i-1], dates[i]],
-                            y: [values[i-1].toFixed(2), value.toFixed(2)],
+                            x: [finalDates[i-1], finalDates[i]],
+                            y: [finalValues[i-1].toFixed(2), value.toFixed(2)],
                             mode: 'lines',
                             line: {
                                 color: color,
@@ -387,17 +421,11 @@
                     }
                 }
                 
-                // Create layout
-                const layout = createLayout(isDarkTheme);
+                // Create layout with 30-minute window
+                const layout = createLayout();
                 
-                // Set the xaxis range to show only the last 45 points by default
-                if (dates.length > 45) {
-                    layout.xaxis.range = [
-                        dates[dates.length - 45],
-                        dates[dates.length - 1]
-                    ];
-                    layout.xaxis.autorange = false;
-                }
+                // Update the xaxis range to show last 30 minutes
+                layout.xaxis.range = [thirtyMinutesAgo, now];
                 
                 // Plot the graph
                 Plotly.newPlot('bayawan-graph', traces, layout, {
@@ -412,30 +440,38 @@
                         'hoverClosestCartesian',
                         'hoverCompareCartesian'
                     ],
-                    displaylogo: false
+                    displaylogo: false,
+                    responsive: true
                 });
             }).fail(function() {
-                console.error("Error fetching Bayawan data.");
+                console.error("Error fetching Bayawan Bridge data.");
             });
         }
         
-        function createLayout(isDarkTheme = true) {
+        function createLayout() {
+            const isDarkTheme = !$('#theme-toggle').is(':checked');
             const textColor = isDarkTheme ? 'white' : 'black';
             const bgColor = isDarkTheme ? 'black' : 'white';
             const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
             
+            // Calculate the time range for last 30 minutes
+            const now = new Date();
+            const thirtyMinutesAgo = new Date(now.getTime() - (30 * 60 * 1000));
+            
             return {
                 title: {
-                    text: 'Bayawan Bridge Water Level',
+                    text: 'Canalum Creek Water Level (Last 30 Minutes)',
                     font: { size: 18, color: textColor }
                 },
                 xaxis: {
                     type: 'date',
                     tickfont: { color: textColor, size: 12 },
-                    gridcolor: gridColor
+                    gridcolor: gridColor,
+                    range: [thirtyMinutesAgo, now], // Set range to last 30 minutes
+                    autorange: false
                 },
                 yaxis: {
-                    range: [0, 200],
+                    range: [0, 200], // Kalumbuyan range
                     title: {
                         text: 'Water Level (cm)',
                         font: { color: textColor, size: 14 }
@@ -469,7 +505,33 @@
                         y: [],
                         type: 'scatter',
                         mode: 'lines+markers'
-                    }], createHistoricalLayout(isDarkTheme));
+                    }], createHistoricalLayout());
+                    return;
+                }
+                
+                // Special case: If there's exactly one data point with value 0 and date "No Data",
+                // we'll still display it as a zero reading rather than "No Data"
+                const isZeroNoDataPoint = bayawanData.values.length === 1 && 
+                                         parseFloat(bayawanData.values[0]) === 0 && 
+                                         bayawanData.dates[0] === "No Data";
+                
+                if (isZeroNoDataPoint) {
+                    // Display zero data for the selected date range
+                    const midDate = new Date(
+                        (new Date(startDate).getTime() + new Date(endDate).getTime()) / 2
+                    ).toLocaleString();
+                    
+                    Plotly.newPlot('historical-bayawan-graph', [{
+                        x: [midDate],
+                        y: [0],
+                        type: 'scatter',
+                        mode: 'markers',
+                        marker: {
+                            size: 10,
+                            color: 'gray'
+                        },
+                        hovertemplate: '0.00 cm<br>%{x}<extra></extra>'
+                    }], createHistoricalLayout());
                     return;
                 }
                 
@@ -477,16 +539,28 @@
                 const values = bayawanData.values.map(v => parseFloat(v));
                 const dates = bayawanData.dates;
                 
+                // Limit data to 20 points for all graphs (newest data first)
+                let finalValues, finalDates;
+                if (values.length > 45) {
+                    // Take the newest 45 points
+                    finalValues = values.slice(-45);
+                    finalDates = dates.slice(-45);
+                } else {
+                    // Use all available points if fewer than 45
+                    finalValues = values;
+                    finalDates = dates;
+                }
+                
                 // Create a trace for each data point with its own color
                 const traces = [];
                 
-                for (let i = 0; i < values.length; i++) {
-                    const value = values[i];
+                for (let i = 0; i < finalValues.length; i++) {
+                    const value = finalValues[i];
                     const color = getColor(value);
                     const fillColor = getFillColor(color);
                     
                     traces.push({
-                        x: [dates[i]],
+                        x: [finalDates[i]],
                         y: [value.toFixed(2)],
                         mode: 'markers',
                         marker: {
@@ -498,7 +572,9 @@
                         hoverlabel: {
                             font: {
                                 color: hoverTextColor
-                            }
+                            },
+                            bgcolor: color,
+                            bordercolor: color
                         },
                         hovertemplate: '%{y} cm<br>%{x}<extra></extra>'
                     });
@@ -506,8 +582,8 @@
                     // Add a line segment if this isn't the first point
                     if (i > 0) {
                         traces.push({
-                            x: [dates[i-1], dates[i]],
-                            y: [values[i-1].toFixed(2), value.toFixed(2)],
+                            x: [finalDates[i-1], finalDates[i]],
+                            y: [finalValues[i-1].toFixed(2), value.toFixed(2)],
                             mode: 'lines',
                             line: {
                                 color: color,
@@ -522,16 +598,11 @@
                 }
                 
                 // Create layout
-                const layout = createHistoricalLayout(isDarkTheme);
+                const layout = createHistoricalLayout();
                 
-                // Set the xaxis range to show only the last 45 points by default
-                if (dates.length > 45) {
-                    layout.xaxis.range = [
-                        dates[dates.length - 45],
-                        dates[dates.length - 1]
-                    ];
-                    layout.xaxis.autorange = false;
-                }
+                // Set the xaxis range to show all 20 points
+                layout.xaxis.range = [finalDates[0], finalDates[finalDates.length - 1]];
+                layout.xaxis.autorange = false;
                 
                 // Plot the graph
                 Plotly.newPlot('historical-bayawan-graph', traces, layout, {
@@ -546,21 +617,23 @@
                         'hoverClosestCartesian',
                         'hoverCompareCartesian'
                     ],
-                    displaylogo: false
+                    displaylogo: false,
+                    responsive: true
                 });
             }).fail(function() {
-                console.error("Error fetching historical Bayawan data.");
+                console.error("Error fetching historical Bayawan Bridge data.");
             });
         }
         
-        function createHistoricalLayout(isDarkTheme = true) {
+        function createHistoricalLayout() {
+            const isDarkTheme = !$('#theme-toggle').is(':checked');
             const textColor = isDarkTheme ? 'white' : 'black';
             const bgColor = isDarkTheme ? 'black' : 'white';
             const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
             
             return {
                 title: {
-                    text: 'Historical Bayawan Bridge Water Level',
+                    text: 'Historical Canalum Creek Water Level',
                     font: { size: 18, color: textColor }
                 },
                 xaxis: {
@@ -600,14 +673,7 @@
                 $('#theme-toggle').prop('checked', false);
             }
             
-            // Initial graph update with the saved theme
             updateBayawanGraph();
-            
-            // Set up auto-refresh every 60 seconds (60000 milliseconds)
-            setInterval(function() {
-                // Only refresh the main graph, not the historical one
-                updateBayawanGraph();
-            }, 60000);
             
             // Set default date values (today and 7 days ago)
             const today = new Date();
@@ -624,7 +690,7 @@
             
             // Set the input values in ISO format for the date picker
             $('#end-date').val(formatDate(today));
-            $('#start-date').val(formatDate(weekAgo));
+            $('#start-date').val(formatDate(weekAgo));      
             
             // Update button click handler - renamed to Generate Graph
             $('#update-graph').on('click', function() {
@@ -662,6 +728,18 @@
                 updateBayawanGraph();
             });
             
+            // Initially hide the historical graph container when page loads
+            $('.historical-graph-container').hide();
+            
+            // Update the auto-refresh interval to 10 seconds for more frequent updates
+            setInterval(function() {
+                // Only auto-refresh the main graph if historical graph is not showing
+                if ($('.historical-graph-container').css('display') === 'none') {
+                    updateBayawanGraph();
+                    console.log("Auto-refreshed Bayawan Bridge water level data");
+                }
+            }, 60000); // 10000 ms = 10 secondsss
+            
             // Theme toggle handler
             $('#theme-toggle').on('change', function() {
                 // Save theme preference to localStorage
@@ -681,9 +759,6 @@
                     updateHistoricalGraph(startDate, endDate);
                 }
             });
-            
-            // Initially hide the historical graph container when page loads
-            $('.historical-graph-container').hide();
         });
     </script>
 

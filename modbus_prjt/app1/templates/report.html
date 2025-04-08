@@ -307,7 +307,10 @@
                     </div>
                 </div>
                 
-                <button type="submit" class="export-btn">Export to Excel</button>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="export-btn">Export to Excel</button>
+                    <button type="button" id="clear-export" class="export-btn" style="background-color: #e07695;">Clear</button>
+                </div>
                 <div id="loading" class="loading">Generating export file...</div>
             </form>
         </div>
@@ -316,6 +319,13 @@
     <script>
         document.querySelector('.export-form').addEventListener('submit', function() {
             document.getElementById('loading').style.display = 'block';
+        });
+
+        // Add clear button functionality
+        document.getElementById('clear-export').addEventListener('click', function() {
+            document.getElementById('export-start-date').value = '';
+            document.getElementById('export-end-date').value = '';
+            document.getElementById('loading').style.display = 'none';
         });
     </script>
 </body>

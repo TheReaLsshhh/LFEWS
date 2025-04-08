@@ -30,7 +30,7 @@
             height: 100vh;
             left: 0;
             top: 0;
-            overflow-y: auto;
+            overflow-y: hiddens;
             transition: all 0.3s ease;
             z-index: 1000;
         }
@@ -50,7 +50,7 @@
         }
 
         .banner {
-            width: 1500px;
+            width: 100% ;
             max-height: 140px;
             text-align: center;
             margin-top: -10px;
@@ -79,8 +79,8 @@
 
         .graph-container {
             width: 90%;
-            height: 500px;
-            background-color: black;
+            height: 600px;
+            background-color: transparent;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
@@ -140,6 +140,68 @@
             border: 1px solid rgba(255, 255, 255, 0.18);
             padding: 10px;
             margin-bottom: 20px;
+            display: inline-block;
+            vertical-align: top;
+        }
+
+        .theme-toggle-container {
+            display: inline-block;
+            margin-left: 20px;
+            padding: 10px;
+            vertical-align: top;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            margin-left: 40px;
+            margin-right: -40px;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #76e095;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .theme-label {
+            display: block;
+            margin-bottom: 5px;
+            text-align: center;
         }
 
         .legend-item {
@@ -158,8 +220,8 @@
         /* Add styles for historical graph container */
         .historical-graph-container {
             width: 90%;
-            height: 500px;
-            background-color: black;
+            height: 600px;
+            background-color: transparent;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
@@ -192,21 +254,35 @@
             <button id="clear-graph" style="background-color: #e07695; color: black; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Clear</button>
         </div>
 
-        <div class="legend-container">
-            <div class="legend-item">
-                <div class="legend-color" style="background: gray"></div>0.00 cm (No Data)
+        <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+            <div class="legend-container">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: gray"></div>0.00 cm (No Data)
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: green"></div>0.01 - 77.59 cm (Normal)
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: yellow"></div>77.60 - 124.99 cm (Alert)
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: orange"></div>125.00 - 169.99 cm (Warning)
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: red"></div>170.00 cm + (Critical)
+                </div>
             </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: green"></div>0.01 - 77.59 cm (Normal)
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: yellow"></div>77.60 - 124.99 cm (Alert)
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: orange"></div>125.00 - 169.99 cm (Warning)
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: red"></div>170.00 cm + (Critical)
+
+            <div class="theme-toggle-container">
+                <div class="theme-label">Background Theme</div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="theme-toggle">
+                    <span class="slider"></span>
+                </label>
+                <div style="font-size: 12px; margin-top: 5px; text-align: center;">
+                    <span style="float: left;">Dark</span>
+                    <span style="float: right;">Light</span>
+                </div>
             </div>
         </div>
 
@@ -242,13 +318,19 @@
         
         function updateKalumbuyanGraph(startDate = null, endDate = null) {
             let url = "{% url 'dashboard' %}?ajax=1";
+            const isDarkTheme = !$('#theme-toggle').is(':checked');
+            const hoverTextColor = isDarkTheme ? 'white' : 'black';
+            
+            // Calculate the time range for last 30 minutes
+            const now = new Date();
+            const thirtyMinutesAgo = new Date(now.getTime() - (30 * 60 * 1000));
             
             if (startDate && endDate) {
                 url += `&start_date=${startDate}&end_date=${endDate}`;
             }
             
             $.getJSON(url, function(data) {
-                const kalumbuyanData = data.kalumbuyantest;
+                const kalumbuyanData = data.canalumtest;
                 
                 if (!kalumbuyanData.values || kalumbuyanData.values.length === 0) {
                     // No data available
@@ -261,20 +343,48 @@
                     return;
                 }
                 
+                // Special case: If there's exactly one data point with value 0 and date "No Data",
+                // we'll still display it as a zero reading rather than "No Data"
+                const isZeroNoDataPoint = kalumbuyanData.values.length === 1 && 
+                                         parseFloat(kalumbuyanData.values[0]) === 0 && 
+                                         kalumbuyanData.dates[0] === "No Data";
+                
+                if (isZeroNoDataPoint) {
+                    // Display zero data with current date/time instead of "No Data"
+                    const currentDate = new Date().toLocaleString();
+                    
+                    Plotly.newPlot('kalumbuyan-graph', [{
+                        x: [currentDate],
+                        y: [0],
+                        type: 'scatter',
+                        mode: 'markers',
+                        marker: {
+                            size: 10,
+                            color: 'gray'
+                        },
+                        hovertemplate: '0.00 cm<br>%{x}<extra></extra>'
+                    }], createLayout());
+                    return;
+                }
+                
                 // Parse values to numbers
                 const values = kalumbuyanData.values.map(v => parseFloat(v));
                 const dates = kalumbuyanData.dates;
                 
+                // Use all available points
+                const finalValues = values;
+                const finalDates = dates;
+                
                 // Create a trace for each data point with its own color
                 const traces = [];
                 
-                for (let i = 0; i < values.length; i++) {
-                    const value = values[i];
+                for (let i = 0; i < finalValues.length; i++) {
+                    const value = finalValues[i];
                     const color = getColor(value);
                     const fillColor = getFillColor(color);
                     
                     traces.push({
-                        x: [dates[i]],
+                        x: [finalDates[i]],
                         y: [value.toFixed(2)],
                         mode: 'markers',
                         marker: {
@@ -283,14 +393,21 @@
                         },
                         showlegend: false,
                         hoverinfo: 'x+y',
+                        hoverlabel: {
+                            font: {
+                                color: hoverTextColor
+                            },
+                            bgcolor: color,
+                            bordercolor: color
+                        },
                         hovertemplate: '%{y} cm<br>%{x}<extra></extra>'
                     });
                     
                     // Add a line segment if this isn't the first point
                     if (i > 0) {
                         traces.push({
-                            x: [dates[i-1], dates[i]],
-                            y: [values[i-1].toFixed(2), value.toFixed(2)],
+                            x: [finalDates[i-1], finalDates[i]],
+                            y: [finalValues[i-1].toFixed(2), value.toFixed(2)],
                             mode: 'lines',
                             line: {
                                 color: color,
@@ -304,17 +421,11 @@
                     }
                 }
                 
-                // Create layout
+                // Create layout with 30-minute window
                 const layout = createLayout();
                 
-                // Set the xaxis range to show only the last 45 points by default
-                if (dates.length > 45) {
-                    layout.xaxis.range = [
-                        dates[dates.length - 45],
-                        dates[dates.length - 1]
-                    ];
-                    layout.xaxis.autorange = false;
-                }
+                // Update the xaxis range to show last 30 minutes
+                layout.xaxis.range = [thirtyMinutesAgo, now];
                 
                 // Plot the graph
                 Plotly.newPlot('kalumbuyan-graph', traces, layout, {
@@ -329,39 +440,51 @@
                         'hoverClosestCartesian',
                         'hoverCompareCartesian'
                     ],
-                    displaylogo: false
+                    displaylogo: false,
+                    responsive: true
                 });
             }).fail(function() {
-                console.error("Error fetching Kalumbuyan data.");
+                console.error("Error fetching Kalumbuyan Bridge data.");
             });
         }
         
         function createLayout() {
+            const isDarkTheme = !$('#theme-toggle').is(':checked');
+            const textColor = isDarkTheme ? 'white' : 'black';
+            const bgColor = isDarkTheme ? 'black' : 'white';
+            const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            
+            // Calculate the time range for last 30 minutes
+            const now = new Date();
+            const thirtyMinutesAgo = new Date(now.getTime() - (30 * 60 * 1000));
+            
             return {
                 title: {
-                    text: 'Kalumbuyan Bridge Water Level',
-                    font: { size: 18, color: 'white' }
+                    text: 'Kalumbuyan Bridge Water Level (Last 30 Minutes)',
+                    font: { size: 18, color: textColor }
                 },
                 xaxis: {
                     type: 'date',
-                    tickfont: { color: 'white', size: 12 },
-                    gridcolor: 'rgba(255, 255, 255, 0.1)'
+                    tickfont: { color: textColor, size: 12 },
+                    gridcolor: gridColor,
+                    range: [thirtyMinutesAgo, now], // Set range to last 30 minutes
+                    autorange: false
                 },
                 yaxis: {
-                    range: [0, 200],
+                    range: [0, 200], // Kalumbuyan range
                     title: {
                         text: 'Water Level (cm)',
-                        font: { color: 'white', size: 14 }
+                        font: { color: textColor, size: 14 }
                     },
                     tickformat: ".2f",
-                    tickfont: { color: 'white', size: 12 },
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    tickfont: { color: textColor, size: 12 },
+                    gridcolor: gridColor,
                     gridwidth: 1
                 },
                 margin: { l: 60, r: 40, t: 50, b: 60 },
-                paper_bgcolor: 'black',
-                plot_bgcolor: 'black',
-                font: { color: 'white' },
+                paper_bgcolor: bgColor,
+                plot_bgcolor: bgColor,
+                font: { color: textColor },
                 showlegend: false,
                 hovermode: 'far'
             };
@@ -369,9 +492,11 @@
         
         function updateHistoricalGraph(startDate, endDate) {
             let url = "{% url 'dashboard' %}?ajax=1&start_date=" + startDate + "&end_date=" + endDate;
+            const isDarkTheme = !$('#theme-toggle').is(':checked');
+            const hoverTextColor = isDarkTheme ? 'white' : 'black';
             
             $.getJSON(url, function(data) {
-                const kalumbuyanData = data.kalumbuyantest;
+                const kalumbuyanData = data.canalumtest;
                 
                 if (!kalumbuyanData.values || kalumbuyanData.values.length === 0) {
                     // No data available
@@ -384,20 +509,58 @@
                     return;
                 }
                 
+                // Special case: If there's exactly one data point with value 0 and date "No Data",
+                // we'll still display it as a zero reading rather than "No Data"
+                const isZeroNoDataPoint = kalumbuyanData.values.length === 1 && 
+                                         parseFloat(kalumbuyanData.values[0]) === 0 && 
+                                         kalumbuyanData.dates[0] === "No Data";
+                
+                if (isZeroNoDataPoint) {
+                    // Display zero data for the selected date range
+                    const midDate = new Date(
+                        (new Date(startDate).getTime() + new Date(endDate).getTime()) / 2
+                    ).toLocaleString();
+                    
+                    Plotly.newPlot('historical-kalumbuyan-graph', [{
+                        x: [midDate],
+                        y: [0],
+                        type: 'scatter',
+                        mode: 'markers',
+                        marker: {
+                            size: 10,
+                            color: 'gray'
+                        },
+                        hovertemplate: '0.00 cm<br>%{x}<extra></extra>'
+                    }], createHistoricalLayout());
+                    return;
+                }
+                
                 // Parse values to numbers
                 const values = kalumbuyanData.values.map(v => parseFloat(v));
                 const dates = kalumbuyanData.dates;
                 
+                // Limit data to 45 points for all graphs (newest data first)
+                let finalValues, finalDates;
+                if (values.length > 45) {
+                    // Take the newest 45 points
+                    finalValues = values.slice(-45);
+                    finalDates = dates.slice(-45);
+                } else {
+                    // Use all available points if fewer than 45
+                    finalValues = values;
+                    finalDates = dates;
+                }
+                
                 // Create a trace for each data point with its own color
                 const traces = [];
                 
-                for (let i = 0; i < values.length; i++) {
-                    const value = values[i];
+                for (let i = 0; i < finalValues.length; i++) {
+                    const value = finalValues[i];
                     const color = getColor(value);
                     const fillColor = getFillColor(color);
                     
                     traces.push({
-                        x: [dates[i]],
+                        x: [finalDates[i]],
                         y: [value.toFixed(2)],
                         mode: 'markers',
                         marker: {
@@ -406,14 +569,21 @@
                         },
                         showlegend: false,
                         hoverinfo: 'x+y',
+                        hoverlabel: {
+                            font: {
+                                color: hoverTextColor
+                            },
+                            bgcolor: color,
+                            bordercolor: color
+                        },
                         hovertemplate: '%{y} cm<br>%{x}<extra></extra>'
                     });
                     
                     // Add a line segment if this isn't the first point
                     if (i > 0) {
                         traces.push({
-                            x: [dates[i-1], dates[i]],
-                            y: [values[i-1].toFixed(2), value.toFixed(2)],
+                            x: [finalDates[i-1], finalDates[i]],
+                            y: [finalValues[i-1].toFixed(2), value.toFixed(2)],
                             mode: 'lines',
                             line: {
                                 color: color,
@@ -430,14 +600,9 @@
                 // Create layout
                 const layout = createHistoricalLayout();
                 
-                // Set the xaxis range to show only the last 45 points by default
-                if (dates.length > 45) {
-                    layout.xaxis.range = [
-                        dates[dates.length - 45],
-                        dates[dates.length - 1]
-                    ];
-                    layout.xaxis.autorange = false;
-                }
+                // Set the xaxis range to show all points
+                layout.xaxis.range = [finalDates[0], finalDates[finalDates.length - 1]];
+                layout.xaxis.autorange = false;
                 
                 // Plot the graph
                 Plotly.newPlot('historical-kalumbuyan-graph', traces, layout, {
@@ -452,39 +617,45 @@
                         'hoverClosestCartesian',
                         'hoverCompareCartesian'
                     ],
-                    displaylogo: false
+                    displaylogo: false,
+                    responsive: true
                 });
             }).fail(function() {
-                console.error("Error fetching historical Kalumbuyan data.");
+                console.error("Error fetching historical Kalumbuyan Bridge data.");
             });
         }
         
         function createHistoricalLayout() {
+            const isDarkTheme = !$('#theme-toggle').is(':checked');
+            const textColor = isDarkTheme ? 'white' : 'black';
+            const bgColor = isDarkTheme ? 'black' : 'white';
+            const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            
             return {
                 title: {
                     text: 'Historical Kalumbuyan Bridge Water Level',
-                    font: { size: 18, color: 'white' }
+                    font: { size: 18, color: textColor }
                 },
                 xaxis: {
                     type: 'date',
-                    tickfont: { color: 'white', size: 12 },
-                    gridcolor: 'rgba(255, 255, 255, 0.1)'
+                    tickfont: { color: textColor, size: 12 },
+                    gridcolor: gridColor
                 },
                 yaxis: {
                     range: [0, 200],
                     title: {
                         text: 'Water Level (cm)',
-                        font: { color: 'white', size: 14 }
+                        font: { color: textColor, size: 14 }
                     },
                     tickformat: ".2f",
-                    tickfont: { color: 'white', size: 12 },
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    tickfont: { color: textColor, size: 12 },
+                    gridcolor: gridColor,
                     gridwidth: 1
                 },
                 margin: { l: 60, r: 40, t: 50, b: 60 },
-                paper_bgcolor: 'black',
-                plot_bgcolor: 'black',
-                font: { color: 'white' },
+                paper_bgcolor: bgColor,
+                plot_bgcolor: bgColor,
+                font: { color: textColor },
                 showlegend: false,
                 hovermode: 'closest'
             };
@@ -492,6 +663,16 @@
         
         // Initial load
         $(document).ready(function() {
+            // Check if theme preference exists in localStorage
+            const savedTheme = localStorage.getItem('kalumbuyanTheme');
+            
+            // If a preference exists, apply it
+            if (savedTheme === 'light') {
+                $('#theme-toggle').prop('checked', true);
+            } else {
+                $('#theme-toggle').prop('checked', false);
+            }
+            
             updateKalumbuyanGraph();
             
             // Set default date values (today and 7 days ago)
@@ -550,14 +731,34 @@
             // Initially hide the historical graph container when page loads
             $('.historical-graph-container').hide();
             
-            // Set up auto-refresh for the main graph every 60 seconds
+            // Update the auto-refresh interval to 10 seconds for more frequent updates
             setInterval(function() {
                 // Only auto-refresh the main graph if historical graph is not showing
                 if ($('.historical-graph-container').css('display') === 'none') {
                     updateKalumbuyanGraph();
                     console.log("Auto-refreshed Kalumbuyan Bridge water level data");
                 }
-            }, 60000); // 60000 ms = 60 seconds
+            }, 10000); // 10000 ms = 10 seconds
+            
+            // Theme toggle handler
+            $('#theme-toggle').on('change', function() {
+                // Save theme preference to localStorage
+                if ($(this).is(':checked')) {
+                    localStorage.setItem('kalumbuyanTheme', 'light');
+                } else {
+                    localStorage.setItem('kalumbuyanTheme', 'dark');
+                }
+                
+                // Update both graphs with the new theme
+                updateKalumbuyanGraph();
+                
+                // Update historical graph if it's visible
+                if ($('.historical-graph-container').is(':visible')) {
+                    const startDate = $('#start-date').val();
+                    const endDate = $('#end-date').val();
+                    updateHistoricalGraph(startDate, endDate);
+                }
+            });
         });
     </script>
 

@@ -1,0 +1,215 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalamtukan - Weather Data</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+        body {
+            display: flex;
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+        .sidebar {
+            width: 200px;
+            background-color: #1e293b;
+            padding: 20px;
+            position: fixed;
+            height: 100vh;
+            left: 0;
+            top: 0;
+            overflow-y: auto;
+        }
+        .main {
+            flex: 1;
+            margin-left: 200px;
+            padding: 20px;
+            width: calc(100% - 200px);
+        }
+        .header {
+            background-color: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(8px);
+            width: 100%;
+            padding: 16px 24px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: 600;
+            border-bottom: 2px solid #38bdf8;
+            border-radius: 12px;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            text-align: center;
+        }
+        .data-table th {
+            background-color: rgba(30, 41, 59, 0.8);
+            color: #38bdf8;
+            font-size: 16px;
+        }
+        .data-table td {
+            font-size: 14px;
+        }
+    </style>
+
+<script>
+    $(document).ready(function(){
+        function refreshData() {
+            // Get current date range values
+            var startDate = $("#start_date").val();
+            var endDate = $("#end_date").val();
+            
+            $.ajax({
+                url: window.location.pathname + "?start_date=" + startDate + "&end_date=" + endDate,
+                type: "GET",
+                dataType: "html",
+                success: function(response) {
+                    var newTableBody = $(response).find("#weather-data tbody").html();
+                    $("#weather-data tbody").fadeOut(300, function() {
+                        $(this).html(newTableBody).fadeIn(300);
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.error("Failed to fetch weather data:", error);
+                }
+            });
+        }
+    
+        // Set up periodic refresh every 60 seconds
+        setInterval(refreshData, 60000);
+    
+        // Add event listener for visibility change
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                refreshData();
+            }
+        });
+    
+        // Add event listeners for date inputs
+        $("#start_date, #end_date").on("change", function() {
+            // Ensure end date is not before start date
+            var startDate = new Date($("#start_date").val());
+            var endDate = new Date($("#end_date").val());
+            
+            if (endDate < startDate) {
+                alert("End date cannot be before start date");
+                $("#end_date").val($("#start_date").val());
+            }
+        });
+    
+        // Add reset button functionality
+        $("#reset-button").on("click", function() {
+            // Clear the date inputs
+            $("#start_date").val('');
+            $("#end_date").val('');
+            
+            // Redirect to the page without query parameters
+            window.location.href = window.location.pathname;
+        });
+    });
+    </script>
+
+</head>
+<body>
+
+    {% include 'sidebar.html' %}
+
+    <div class="main">
+        <div class="header">Kalamtukan - Weather Data</div>
+
+        {% if weather_data.error %}
+            <p style="color: #ff4444; font-size: 18px;">{{ weather_data.error }}</p>
+        {% else %}
+            <h2>Latest Weather Data</h2>
+            <!-- Replace the existing filter form with this date range picker -->
+                <form method="get" style="margin: 20px 0; display: flex; align-items: center; gap: 10px;">
+                    <div class="date-range" style="display: flex; align-items: center; gap: 10px;">
+                        <label for="start_date">From:</label>
+                        <input 
+                            type="date" 
+                            id="start_date" 
+                            name="start_date" 
+                            value="{{ start_date }}"
+                            style="padding: 8px; border-radius: 4px; border: 1px solid #38bdf8; background: rgba(30, 41, 59, 0.8); color: #e2e8f0;"
+                        >
+                        
+                        <label for="end_date">To:</label>
+                        <input 
+                            type="date" 
+                            id="end_date" 
+                            name="end_date" 
+                            value="{{ end_date }}"
+                            style="padding: 8px; border-radius: 4px; border: 1px solid #38bdf8; background: rgba(30, 41, 59, 0.8); color: #e2e8f0;"
+                        >
+                        
+                        <button type="submit" style="padding: 8px 16px; background: #38bdf8; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Apply Filter
+                        </button>
+                    </div>
+
+                    <button type="button" id="reset-button" style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Reset
+                    </button>
+            </form>
+            <table class="data-table" id="weather-data">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Temperature</th>
+                        <th>Dew Point</th>
+                        <th>Humidity</th>
+                        <th>Wind</th>
+                        <th>Speed</th>
+                        <th>Gust</th>
+                        <th>Pressure</th>
+                        <th>Precip. Rate</th>
+                        <th>Precip. Accum</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% if weather_data.weather_table_data %}
+                        {% for row in weather_data.weather_table_data %}
+                        <tr {% if row.temperature == "Server Offline" %}style="background-color: rgba(255, 0, 0, 0.1); color: #ff8888;"{% endif %}>
+                            <td>{{ row.time }}</td>
+                            <td>{{ row.temperature }}</td>
+                            <td>{{ row.dewpoint }}</td>
+                            <td>{{ row.humidity }}</td>
+                            <td>{{ row.wind_direction }}</td>
+                            <td>{{ row.wind_speed }}</td>
+                            <td>{{ row.wind_gust }}</td>
+                            <td>{{ row.pressure }}</td>
+                            <td>{{ row.precip_rate }}</td>
+                            <td>{{ row.precip_accum }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="10" style="text-align: center; color: red;">No Data Available</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+
+</body>
+</html> 

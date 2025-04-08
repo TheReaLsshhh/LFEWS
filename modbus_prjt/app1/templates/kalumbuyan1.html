@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jugno Creek Water Level</title>
+    <title>Canalum Creek Water Level</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
@@ -30,7 +30,7 @@
             height: 100vh;
             left: 0;
             top: 0;
-            overflow-y: hiddens;
+            overflow-y: auto;
             transition: all 0.3s ease;
             z-index: 1000;
         }
@@ -50,7 +50,7 @@
         }
 
         .banner {
-            width: 100% ;
+            width: 1500px;
             max-height: 140px;
             text-align: center;
             margin-top: -10px;
@@ -243,7 +243,7 @@
             <img src="{% static 'images/banner.png' %}" alt="Banner">
         </div>
 
-        <div class="header">Jugno Creek Water Level</div>
+        <div class="header">Kalumbuyan Bridge Water Level</div>
 
         <div class="date-picker-container">
             <label for="start-date">Start Date: </label>
@@ -287,12 +287,12 @@
         </div>
 
         <div class="graph-container">
-            <div id="jugno-graph"></div>
+            <div id="kalumbuyan-graph"></div>
         </div>
 
         <!-- Add historical graph container after the main graph container -->
         <div class="historical-graph-container">
-            <div id="historical-jugno-graph"></div>
+            <div id="historical-kalumbuyan-graph"></div>
         </div>
     </div>
 
@@ -316,25 +316,21 @@
             }
         }
         
-        function updateJugnoGraph(startDate = null, endDate = null) {
+        function updateKalumbuyanGraph(startDate = null, endDate = null) {
             let url = "{% url 'dashboard' %}?ajax=1";
             const isDarkTheme = !$('#theme-toggle').is(':checked');
             const hoverTextColor = isDarkTheme ? 'white' : 'black';
-            
-            // Calculate the time range for last 30 minutes
-            const now = new Date();
-            const thirtyMinutesAgo = new Date(now.getTime() - (30 * 60 * 1000));
             
             if (startDate && endDate) {
                 url += `&start_date=${startDate}&end_date=${endDate}`;
             }
             
             $.getJSON(url, function(data) {
-                const jugnoData = data.jugnotest;
+                const kalumbuyanData = data.kalumbuyantest;
                 
-                if (!jugnoData.values || jugnoData.values.length === 0) {
+                if (!kalumbuyanData.values || kalumbuyanData.values.length === 0) {
                     // No data available
-                    Plotly.newPlot('jugno-graph', [{
+                    Plotly.newPlot('kalumbuyan-graph', [{
                         x: [],
                         y: [],
                         type: 'scatter',
@@ -345,15 +341,15 @@
                 
                 // Special case: If there's exactly one data point with value 0 and date "No Data",
                 // we'll still display it as a zero reading rather than "No Data"
-                const isZeroNoDataPoint = jugnoData.values.length === 1 && 
-                                         parseFloat(jugnoData.values[0]) === 0 && 
-                                         jugnoData.dates[0] === "No Data";
+                const isZeroNoDataPoint = kalumbuyanData.values.length === 1 && 
+                                         parseFloat(kalumbuyanData.values[0]) === 0 && 
+                                         kalumbuyanData.dates[0] === "No Data";
                 
                 if (isZeroNoDataPoint) {
                     // Display zero data with current date/time instead of "No Data"
                     const currentDate = new Date().toLocaleString();
                     
-                    Plotly.newPlot('jugno-graph', [{
+                    Plotly.newPlot('kalumbuyan-graph', [{
                         x: [currentDate],
                         y: [0],
                         type: 'scatter',
@@ -368,12 +364,20 @@
                 }
                 
                 // Parse values to numbers
-                const values = jugnoData.values.map(v => parseFloat(v));
-                const dates = jugnoData.dates;
+                const values = kalumbuyanData.values.map(v => parseFloat(v));
+                const dates = kalumbuyanData.dates;
                 
-                // Use all available points
-                const finalValues = values;
-                const finalDates = dates;
+                // Limit data to 20 points for all graphs (newest data first)
+                let finalValues, finalDates;
+                if (values.length > 45) {
+                    // Take the newest 45 points
+                    finalValues = values.slice(-45);
+                    finalDates = dates.slice(-45);
+                } else {
+                    // Use all available points if fewer than 45
+                    finalValues = values;
+                    finalDates = dates;
+                }
                 
                 // Create a trace for each data point with its own color
                 const traces = [];
@@ -421,14 +425,20 @@
                     }
                 }
                 
-                // Create layout with 30-minute window
+                // Create layout
                 const layout = createLayout();
                 
-                // Update the xaxis range to show last 30 minutes
-                layout.xaxis.range = [thirtyMinutesAgo, now];
+                // Set the xaxis range to show only the last 45 points by default
+                if (dates.length > 45) {
+                    layout.xaxis.range = [
+                        dates[dates.length - 45],
+                        dates[dates.length - 1]
+                    ];
+                    layout.xaxis.autorange = false;
+                }
                 
                 // Plot the graph
-                Plotly.newPlot('jugno-graph', traces, layout, {
+                Plotly.newPlot('kalumbuyan-graph', traces, layout, {
                     displayModeBar: true,
                     modeBarButtonsToRemove: [
                         'pan2d',
@@ -444,7 +454,7 @@
                     responsive: true
                 });
             }).fail(function() {
-                console.error("Error fetching Jugno Creek data.");
+                console.error("Error fetching Kalumbuyan data.");
             });
         }
         
@@ -454,24 +464,18 @@
             const bgColor = isDarkTheme ? 'black' : 'white';
             const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
             
-            // Calculate the time range for last 30 minutes
-            const now = new Date();
-            const thirtyMinutesAgo = new Date(now.getTime() - (30 * 60 * 1000));
-            
             return {
                 title: {
-                    text: 'Jugno Creek Water Level (Last 30 Minutes)',
+                    text: 'Kalumbuyan Bridge Water Level',
                     font: { size: 18, color: textColor }
                 },
                 xaxis: {
                     type: 'date',
                     tickfont: { color: textColor, size: 12 },
-                    gridcolor: gridColor,
-                    range: [thirtyMinutesAgo, now], // Set range to last 30 minutes
-                    autorange: false
+                    gridcolor: gridColor
                 },
                 yaxis: {
-                    range: [0, 200], // Jugno range
+                    range: [0, 200],
                     title: {
                         text: 'Water Level (cm)',
                         font: { color: textColor, size: 14 }
@@ -496,11 +500,11 @@
             const hoverTextColor = isDarkTheme ? 'white' : 'black';
             
             $.getJSON(url, function(data) {
-                const jugnoData = data.jugnotest;
+                const kalumbuyanData = data.kalumbuyantest;
                 
-                if (!jugnoData.values || jugnoData.values.length === 0) {
+                if (!kalumbuyanData.values || kalumbuyanData.values.length === 0) {
                     // No data available
-                    Plotly.newPlot('historical-jugno-graph', [{
+                    Plotly.newPlot('historical-kalumbuyan-graph', [{
                         x: [],
                         y: [],
                         type: 'scatter',
@@ -511,9 +515,9 @@
                 
                 // Special case: If there's exactly one data point with value 0 and date "No Data",
                 // we'll still display it as a zero reading rather than "No Data"
-                const isZeroNoDataPoint = jugnoData.values.length === 1 && 
-                                         parseFloat(jugnoData.values[0]) === 0 && 
-                                         jugnoData.dates[0] === "No Data";
+                const isZeroNoDataPoint = kalumbuyanData.values.length === 1 && 
+                                         parseFloat(kalumbuyanData.values[0]) === 0 && 
+                                         kalumbuyanData.dates[0] === "No Data";
                 
                 if (isZeroNoDataPoint) {
                     // Display zero data for the selected date range
@@ -521,7 +525,7 @@
                         (new Date(startDate).getTime() + new Date(endDate).getTime()) / 2
                     ).toLocaleString();
                     
-                    Plotly.newPlot('historical-jugno-graph', [{
+                    Plotly.newPlot('historical-kalumbuyan-graph', [{
                         x: [midDate],
                         y: [0],
                         type: 'scatter',
@@ -536,8 +540,8 @@
                 }
                 
                 // Parse values to numbers
-                const values = jugnoData.values.map(v => parseFloat(v));
-                const dates = jugnoData.dates;
+                const values = kalumbuyanData.values.map(v => parseFloat(v));
+                const dates = kalumbuyanData.dates;
                 
                 // Limit data to 20 points for all graphs (newest data first)
                 let finalValues, finalDates;
@@ -605,7 +609,7 @@
                 layout.xaxis.autorange = false;
                 
                 // Plot the graph
-                Plotly.newPlot('historical-jugno-graph', traces, layout, {
+                Plotly.newPlot('historical-kalumbuyan-graph', traces, layout, {
                     displayModeBar: true,
                     modeBarButtonsToRemove: [
                         'pan2d',
@@ -621,7 +625,7 @@
                     responsive: true
                 });
             }).fail(function() {
-                console.error("Error fetching historical Jugno Creek data.");
+                console.error("Error fetching historical Kalumbuyan data.");
             });
         }
         
@@ -633,7 +637,7 @@
             
             return {
                 title: {
-                    text: 'Historical Jugno Creek Water Level',
+                    text: 'Historical Kalumbuyan Bridge Water Level',
                     font: { size: 18, color: textColor }
                 },
                 xaxis: {
@@ -664,7 +668,7 @@
         // Initial load
         $(document).ready(function() {
             // Check if theme preference exists in localStorage
-            const savedTheme = localStorage.getItem('jugnoTheme');
+            const savedTheme = localStorage.getItem('kalumbuyanTheme');
             
             // If a preference exists, apply it
             if (savedTheme === 'light') {
@@ -673,7 +677,7 @@
                 $('#theme-toggle').prop('checked', false);
             }
             
-            updateJugnoGraph();
+            updateKalumbuyanGraph();
             
             // Set default date values (today and 7 days ago)
             const today = new Date();
@@ -711,7 +715,7 @@
                 $('.historical-graph-container').show();
                 
                 // Update both current and historical graphs
-                updateJugnoGraph();
+                updateKalumbuyanGraph();
                 updateHistoricalGraph(startDate, endDate);
             });
             
@@ -725,32 +729,32 @@
                 $('.historical-graph-container').hide();
                 
                 // Update current graph with default date range
-                updateJugnoGraph();
+                updateKalumbuyanGraph();
             });
             
             // Initially hide the historical graph container when page loads
             $('.historical-graph-container').hide();
             
-            // Update the auto-refresh interval to 10 seconds for more frequent updates
+            // Set up auto-refresh for the main graph every 60 seconds
             setInterval(function() {
                 // Only auto-refresh the main graph if historical graph is not showing
                 if ($('.historical-graph-container').css('display') === 'none') {
-                    updateJugnoGraph();
-                    console.log("Auto-refreshed Jugno Creek water level data");
+                    updateKalumbuyanGraph();
+                    console.log("Auto-refreshed Kalumbuyan Bridge water level data");
                 }
-            }, 60000); // 10000 ms = 10 secondsss
+            }, 60000); // 60000 ms = 60 seconds
             
             // Theme toggle handler
             $('#theme-toggle').on('change', function() {
                 // Save theme preference to localStorage
                 if ($(this).is(':checked')) {
-                    localStorage.setItem('jugnoTheme', 'light');
+                    localStorage.setItem('kalumbuyanTheme', 'light');
                 } else {
-                    localStorage.setItem('jugnoTheme', 'dark');
+                    localStorage.setItem('kalumbuyanTheme', 'dark');
                 }
                 
                 // Update both graphs with the new theme
-                updateJugnoGraph();
+                updateKalumbuyanGraph();
                 
                 // Update historical graph if it's visible
                 if ($('.historical-graph-container').is(':visible')) {

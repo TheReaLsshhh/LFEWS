@@ -1,0 +1,154 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Updates</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { display: flex; height: 100vh; background-color: #0f172a; color: #e2e8f0; }
+        .sidebar { width: 200px; background-color: #1e293b; padding: 20px; position: fixed; height: 100vh; left: 0; top: 0; overflow-y: auto; }
+        .main { flex: 1; margin-left: 200px; display: flex; flex-direction: column; align-items: center; padding: 20px; width: calc(100% - 200px); }
+        .banner { width: 100%; max-height: 140px; text-align: center; margin-bottom: 5px; }
+        .banner img { width: 100%; max-height: 140px; object-fit: contain; }
+        .header { background-color: rgba(30, 41, 59, 0.8); backdrop-filter: blur(8px); width: 100%; padding: 16px 24px; text-align: center;
+                  font-size: 24px; font-weight: 600; border-bottom: 2px solid #38bdf8; position: sticky; top: 0; z-index: 100; margin-bottom: 20px; border-radius: 12px; }
+        .weather-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; width: 100%; padding: 0 12px; }
+        .weather-box { background: linear-gradient(145deg, #1e293b, #334155); padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); transition: transform 0.2s ease; }
+        .weather-box:hover { transform: translateY(-4px); }
+        .weather-header { display: flex; align-items: center; gap: 10px; }
+        .station-name { font-size: 20px; font-weight: 600; color: #38bdf8; }
+        .weather-icon { width: 80px; height: 80px; filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.3)); }
+        .weather-data { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 20px 0; }
+        .data-item { padding: 8px; border-radius: 8px; background-color: rgba(15, 23, 42, 0.3); }
+        .data-label { font-size: 14px; color: #94a3b8; }
+        .data-value { font-size: 20px; font-weight: 600; color: #e2e8f0; }
+        .highlight { color: #38bdf8; font-size: 28px; font-weight: 700; }
+        .error-message { color: #ef4444; padding: 10px; background-color: rgba(239, 68, 68, 0.1); border-radius: 8px; margin: 15px 0; text-align: center; }
+        .retry-button { display: inline-block; background-color: #38bdf8; color: white; padding: 5px 10px; border-radius: 4px; margin-top: 10px; cursor: pointer; }
+        .loading { text-align: center; padding: 20px; }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .main {
+                margin-left: 0;
+                width: 100%;
+            }
+            .weather-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div class="main">
+        <div class="banner">
+            <img src="{% static 'images/banner.png' %}" alt="Banner">
+        </div>
+        <div class="header">Weather Updates</div>
+        <div class="weather-container" id="weather-container">
+            {% for station_name, station_data in weather_data.items %}
+                <div class="weather-box">
+                    <div class="weather-header">
+                        {% if station_data.error %}
+                            <img src="{% static 'images/weather1.png' %}" class="weather-icon" alt="Weather Icon">
+                        {% else %}
+                            {% with temp=station_data.temperature|default:"0"|stringformat:"s"|slice:":-3"|add:"0" %}
+                                {% if station_data.precip_rate|default:"0"|stringformat:"s"|slice:":-6"|add:"0"|add:"0" > "0" %}
+                                    <img src="{% static 'images/rainy.png' %}" class="weather-icon" alt="Rainy Weather">
+                                {% elif station_data.wind_speed|default:"0"|stringformat:"s"|slice:":-5"|add:"0"|add:"0" > "20" %}
+                                    <img src="{% static 'images/windy.png' %}" class="weather-icon" alt="Windy Weather">
+                                {% elif temp|add:"0" > "30" %}
+                                    <img src="{% static 'images/hot.png' %}" class="weather-icon" alt="Hot Weather">
+                                {% elif temp|add:"0" < "15" %}
+                                    <img src="{% static 'images/cold.png' %}" class="weather-icon" alt="Cold Weather">
+                                {% else %}
+                                    <img src="{% static 'images/cloudy.png' %}" class="weather-icon" alt="Cloudy Weather">
+                                {% endif %}
+                            {% endwith %}
+                        {% endif %}
+                        <h2 class="station-name">{{ station_name }}</h2>
+                    </div>
+                    <!-- <p class="location">{{ station_data.location|default:"Location unavailable" }}</p> -->
+                    {% if station_data.error %}
+                        <div class="error-message">
+                            {% if station_data.error == "Server Offline" %}
+                                <p>Server Offline</p>
+                                <p>Weather station is currently offline.</p>
+                            {% else %}
+                                <p>{{ station_data.error }}</p>
+                                <p>Station may be offline or experiencing connectivity issues.</p>
+                            {% endif %}
+                        </div>
+                        <div class="weather-data">
+                            <div class="data-item"><div class="data-label">Temperature</div><div class="data-value">N/A</div></div>
+                            <div class="data-item"><div class="data-label">Precipitation Rate</div><div class="data-value">N/A</div></div>
+                            <div class="data-item"><div class="data-label">Dewpoint</div><div class="data-value">N/A</div></div>
+                            <div class="data-item"><div class="data-label">Precip Accum</div><div class="data-value">N/A</div></div>
+                            <div class="data-item"><div class="data-label">Wind Direction</div><div class="data-value">N/A</div></div>
+                            <div class="data-item"><div class="data-label">Humidity</div><div class="data-value">N/A</div></div>
+                            <div class="data-item"><div class="data-label">Wind & Gust</div><div class="data-value">N/A</div></div>
+                            <div class="data-item"><div class="data-label">Pressure</div><div class="data-value">N/A</div></div>
+                        </div>
+                    {% else %}
+                        <div class="weather-data">
+                            <div class="data-item"><div class="data-label">Temperature</div><div class="data-value highlight">{{ station_data.temperature|default:"N/A" }}°C</div></div>
+                            <div class="data-item"><div class="data-label">Precipitation Rate</div><div class="data-value highlight">{{ station_data.precip_rate|default:"0.00" }} mm/hr</div></div>
+                            <div class="data-item"><div class="data-label">Dewpoint</div><div class="data-value highlight">{{ station_data.dewpoint|default:"N/A" }}°C</div></div>
+                            <div class="data-item"><div class="data-label">Precip Accum</div><div class="data-value">{{ station_data.precip_accum|default:"0.00" }} mm</div></div>
+                            <div class="data-item"><div class="data-label">Wind Direction</div><div class="data-value">{{ station_data.wind_direction|default:"N/A" }}</div></div>
+                            <div class="data-item"><div class="data-label">Humidity</div><div class="data-value">{{ station_data.humidity|default:"N/A" }}%</div></div>
+                            <div class="data-item"><div class="data-label">Wind & Gust</div><div class="data-value">{{ station_data.wind_speed|default:"N/A" }} / <strong>{{ station_data.wind_gust|default:"N/A" }}</strong> km/h</div></div>
+                            <div class="data-item"><div class="data-label">Pressure</div><div class="data-value">{{ station_data.pressure|default:"N/A" }} hPa</div></div>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+    $(document).ready(function(){
+        // Auto-refresh
+        function refreshWeatherData() {
+            $("#weather-container").append('<div class="loading">Refreshing weather data...</div>');
+            
+            $.ajax({
+                url: "{% url 'weather_updates_view' %}",
+                type: "GET",
+                dataType: "html",
+                timeout: 30000, // 30 seconds timeout
+                success: function(response) {
+                    $(".loading").remove();
+                    $("#weather-container").fadeOut(300, function() {
+                        $(this).html($(response).find("#weather-container").html()).fadeIn(300);
+                    });
+                },
+                error: function(xhr, status, error) {
+                    $(".loading").remove();
+                    console.error("Failed to fetch weather data:", error);
+                    $("#weather-container").append(
+                        '<div class="error-message">' +
+                        '<p>Failed to refresh weather data. Please try again later.</p>' +
+                        '<button class="retry-button" onclick="location.reload()">Retry Now</button>' +
+                        '</div>'
+                    );
+                }
+            });
+        }
+        
+        // Refresh every 60 seconds
+        setInterval(refreshWeatherData, 300000);
+    });
+    </script>
+</body>
+</html>

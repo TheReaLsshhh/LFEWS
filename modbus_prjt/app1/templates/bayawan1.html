@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jugno Creek Water Level</title>
+    <title>Bayawan Bridge Water Level</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
@@ -30,7 +30,7 @@
             height: 100vh;
             left: 0;
             top: 0;
-            overflow-y: hiddens;
+            overflow-y: auto;
             transition: all 0.3s ease;
             z-index: 1000;
         }
@@ -50,7 +50,7 @@
         }
 
         .banner {
-            width: 100% ;
+            width: 1500px;
             max-height: 140px;
             text-align: center;
             margin-top: -10px;
@@ -220,7 +220,7 @@
         /* Add styles for historical graph container */
         .historical-graph-container {
             width: 90%;
-            height: 600px;
+            height: 500px;
             background-color: transparent;
             border-radius: 8px;
             padding: 20px;
@@ -243,7 +243,7 @@
             <img src="{% static 'images/banner.png' %}" alt="Banner">
         </div>
 
-        <div class="header">Jugno Creek Water Level</div>
+        <div class="header">Bayawan Bridge Water Level</div>
 
         <div class="date-picker-container">
             <label for="start-date">Start Date: </label>
@@ -260,13 +260,13 @@
                     <div class="legend-color" style="background: gray"></div>0.00 cm (No Data)
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: green"></div>0.01 - 77.59 cm (Normal)
+                    <div class="legend-color" style="background: green"></div>0.01 - 90.99 cm (Normal)
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: yellow"></div>77.60 - 124.99 cm (Alert)
+                    <div class="legend-color" style="background: yellow"></div>91.00 - 120.99 cm (Alert)
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: orange"></div>125.00 - 169.99 cm (Warning)
+                    <div class="legend-color" style="background: orange"></div>121.00 - 169.99 cm (Warning)
                 </div>
                 <div class="legend-item">
                     <div class="legend-color" style="background: red"></div>170.00 cm + (Critical)
@@ -287,20 +287,20 @@
         </div>
 
         <div class="graph-container">
-            <div id="jugno-graph"></div>
+            <div id="bayawan-graph"></div>
         </div>
 
         <!-- Add historical graph container after the main graph container -->
         <div class="historical-graph-container">
-            <div id="historical-jugno-graph"></div>
+            <div id="historical-bayawan-graph"></div>
         </div>
     </div>
 
     <script>
         function getColor(value) {
             if (value === 0) return 'gray';
-            if (value <= 77.59) return 'green';
-            if (value <= 124.99) return 'yellow';
+            if (value <= 90.99) return 'green';
+            if (value <= 120.99) return 'yellow';
             if (value <= 169.99) return 'orange';
             return 'red';
         }
@@ -316,7 +316,48 @@
             }
         }
         
-        function updateJugnoGraph(startDate = null, endDate = null) {
+        function createLayout(isDarkTheme = true) {
+            const textColor = isDarkTheme ? 'white' : 'black';
+            const bgColor = isDarkTheme ? 'black' : 'white';
+            const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            
+            // Calculate the time range for last 30 minutes
+            const now = new Date();
+            const thirtyMinutesAgo = new Date(now.getTime() - (30 * 60 * 1000));
+            
+            return {
+                title: {
+                    text: 'Bayawan Bridge Water Level (Last 30 Minutes)',
+                    font: { size: 18, color: textColor }
+                },
+                xaxis: {
+                    type: 'date',
+                    tickfont: { color: textColor, size: 12 },
+                    gridcolor: gridColor,
+                    range: [thirtyMinutesAgo, now],
+                    autorange: false
+                },
+                yaxis: {
+                    range: [0, 200],
+                    title: {
+                        text: 'Water Level (cm)',
+                        font: { color: textColor, size: 14 }
+                    },
+                    tickformat: ".2f",
+                    tickfont: { color: textColor, size: 12 },
+                    gridcolor: gridColor,
+                    gridwidth: 1
+                },
+                margin: { l: 60, r: 40, t: 50, b: 60 },
+                paper_bgcolor: bgColor,
+                plot_bgcolor: bgColor,
+                font: { color: textColor },
+                showlegend: false,
+                hovermode: 'closest'
+            };
+        }
+        
+        function updateBayawanGraph(startDate = null, endDate = null) {
             let url = "{% url 'dashboard' %}?ajax=1";
             const isDarkTheme = !$('#theme-toggle').is(':checked');
             const hoverTextColor = isDarkTheme ? 'white' : 'black';
@@ -330,46 +371,141 @@
             }
             
             $.getJSON(url, function(data) {
-                const jugnoData = data.jugnotest;
+                const bayawanData = data.bywntest;
                 
-                if (!jugnoData.values || jugnoData.values.length === 0) {
+                if (!bayawanData.values || bayawanData.values.length === 0) {
                     // No data available
-                    Plotly.newPlot('jugno-graph', [{
+                    Plotly.newPlot('bayawan-graph', [{
                         x: [],
                         y: [],
                         type: 'scatter',
                         mode: 'lines+markers'
-                    }], createLayout());
+                    }], createLayout(isDarkTheme));
                     return;
                 }
                 
-                // Special case: If there's exactly one data point with value 0 and date "No Data",
-                // we'll still display it as a zero reading rather than "No Data"
-                const isZeroNoDataPoint = jugnoData.values.length === 1 && 
-                                         parseFloat(jugnoData.values[0]) === 0 && 
-                                         jugnoData.dates[0] === "No Data";
+                // Parse values to numbers and create date objects
+                const values = bayawanData.values.map(v => parseFloat(v));
+                const dates = bayawanData.dates.map(d => new Date(d));
                 
-                if (isZeroNoDataPoint) {
-                    // Display zero data with current date/time instead of "No Data"
-                    const currentDate = new Date().toLocaleString();
+                // Filter data points for the last 30 minutes
+                const filteredData = dates.map((date, index) => ({
+                    date: date,
+                    value: values[index]
+                })).filter(point => point.date >= thirtyMinutesAgo);
+                
+                // Ensure we have at least 30 points
+                let finalData = filteredData;
+                if (filteredData.length < 30 && values.length >= 30) {
+                    // If we have enough total points but not enough in last 30 minutes,
+                    // take the 30 most recent points
+                    finalData = dates.map((date, index) => ({
+                        date: date,
+                        value: values[index]
+                    })).slice(-30);
+                }
+                
+                const finalValues = finalData.map(point => point.value);
+                const finalDates = finalData.map(point => point.date);
+                
+                // Create traces for the data points
+                const traces = [];
+                
+                for (let i = 0; i < finalValues.length; i++) {
+                    const value = finalValues[i];
+                    const color = getColor(value);
+                    const fillColor = getFillColor(color);
                     
-                    Plotly.newPlot('jugno-graph', [{
-                        x: [currentDate],
-                        y: [0],
-                        type: 'scatter',
+                    traces.push({
+                        x: [finalDates[i]],
+                        y: [value.toFixed(2)],
                         mode: 'markers',
                         marker: {
                             size: 10,
-                            color: 'gray'
+                            color: color
                         },
-                        hovertemplate: '0.00 cm<br>%{x}<extra></extra>'
-                    }], createLayout());
+                        showlegend: false,
+                        hoverinfo: 'x+y',
+                        hoverlabel: {
+                            font: {
+                                color: hoverTextColor
+                            }
+                        },
+                        hovertemplate: '%{y} cm<br>%{x}<extra></extra>'
+                    });
+                    
+                    // Add a line segment if this isn't the first point
+                    if (i > 0) {
+                        traces.push({
+                            x: [finalDates[i-1], finalDates[i]],
+                            y: [finalValues[i-1].toFixed(2), value.toFixed(2)],
+                            mode: 'lines',
+                            line: {
+                                color: color,
+                                width: 2
+                            },
+                            fill: 'tozeroy',
+                            fillcolor: fillColor,
+                            showlegend: false,
+                            hoverinfo: 'none'
+                        });
+                    }
+                }
+                
+                // Create layout
+                const layout = createLayout(isDarkTheme);
+                
+                // Set the x-axis range based on the data
+                if (finalDates.length > 0) {
+                    layout.xaxis.range = [
+                        finalDates[0],
+                        Math.max(finalDates[finalDates.length - 1], now)
+                    ];
+                }
+                
+                // Plot the graph
+                Plotly.newPlot('bayawan-graph', traces, layout, {
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: [
+                        'pan2d',
+                        'select2d',
+                        'lasso2d',
+                        'resetScale2d',
+                        'toImage',
+                        'autoScale2d',
+                        'hoverClosestCartesian',
+                        'hoverCompareCartesian'
+                    ],
+                    displaylogo: false,
+                    responsive: true
+                });
+            }).fail(function() {
+                console.error("Error fetching Bayawan data.");
+            });
+        }
+        
+        function updateHistoricalGraph(startDate, endDate) {
+            let url = "{% url 'dashboard' %}?ajax=1&start_date=" + startDate + "&end_date=" + endDate;
+            const isDarkTheme = !$('#theme-toggle').is(':checked');
+            const hoverTextColor = isDarkTheme ? 'white' : 'black';
+            
+            $.getJSON(url, function(data) {
+                const bayawanData = data.bywntest;
+                
+                if (!bayawanData.values || bayawanData.values.length === 0) {
+                    // No data available
+                    Plotly.newPlot('historical-bayawan-graph', [{
+                        x: [],
+                        y: [],
+                        type: 'scatter',
+                        mode: 'lines+markers'
+                    }], createHistoricalLayout(isDarkTheme));
                     return;
                 }
                 
                 // Parse values to numbers
-                const values = jugnoData.values.map(v => parseFloat(v));
-                const dates = jugnoData.dates;
+                const values = bayawanData.values.map(v => parseFloat(v));
+                const dates = bayawanData.dates;
                 
                 // Use all available points
                 const finalValues = values;
@@ -396,185 +532,7 @@
                         hoverlabel: {
                             font: {
                                 color: hoverTextColor
-                            },
-                            bgcolor: color,
-                            bordercolor: color
-                        },
-                        hovertemplate: '%{y} cm<br>%{x}<extra></extra>'
-                    });
-                    
-                    // Add a line segment if this isn't the first point
-                    if (i > 0) {
-                        traces.push({
-                            x: [finalDates[i-1], finalDates[i]],
-                            y: [finalValues[i-1].toFixed(2), value.toFixed(2)],
-                            mode: 'lines',
-                            line: {
-                                color: color,
-                                width: 2
-                            },
-                            fill: 'tozeroy',
-                            fillcolor: fillColor,
-                            showlegend: false,
-                            hoverinfo: 'none'
-                        });
-                    }
-                }
-                
-                // Create layout with 30-minute window
-                const layout = createLayout();
-                
-                // Update the xaxis range to show last 30 minutes
-                layout.xaxis.range = [thirtyMinutesAgo, now];
-                
-                // Plot the graph
-                Plotly.newPlot('jugno-graph', traces, layout, {
-                    displayModeBar: true,
-                    modeBarButtonsToRemove: [
-                        'pan2d',
-                        'select2d',
-                        'lasso2d',
-                        'resetScale2d',
-                        'toImage',
-                        'autoScale2d',
-                        'hoverClosestCartesian',
-                        'hoverCompareCartesian'
-                    ],
-                    displaylogo: false,
-                    responsive: true
-                });
-            }).fail(function() {
-                console.error("Error fetching Jugno Creek data.");
-            });
-        }
-        
-        function createLayout() {
-            const isDarkTheme = !$('#theme-toggle').is(':checked');
-            const textColor = isDarkTheme ? 'white' : 'black';
-            const bgColor = isDarkTheme ? 'black' : 'white';
-            const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-            
-            // Calculate the time range for last 30 minutes
-            const now = new Date();
-            const thirtyMinutesAgo = new Date(now.getTime() - (30 * 60 * 1000));
-            
-            return {
-                title: {
-                    text: 'Jugno Creek Water Level (Last 30 Minutes)',
-                    font: { size: 18, color: textColor }
-                },
-                xaxis: {
-                    type: 'date',
-                    tickfont: { color: textColor, size: 12 },
-                    gridcolor: gridColor,
-                    range: [thirtyMinutesAgo, now], // Set range to last 30 minutes
-                    autorange: false
-                },
-                yaxis: {
-                    range: [0, 200], // Jugno range
-                    title: {
-                        text: 'Water Level (cm)',
-                        font: { color: textColor, size: 14 }
-                    },
-                    tickformat: ".2f",
-                    tickfont: { color: textColor, size: 12 },
-                    gridcolor: gridColor,
-                    gridwidth: 1
-                },
-                margin: { l: 60, r: 40, t: 50, b: 60 },
-                paper_bgcolor: bgColor,
-                plot_bgcolor: bgColor,
-                font: { color: textColor },
-                showlegend: false,
-                hovermode: 'far'
-            };
-        }
-        
-        function updateHistoricalGraph(startDate, endDate) {
-            let url = "{% url 'dashboard' %}?ajax=1&start_date=" + startDate + "&end_date=" + endDate;
-            const isDarkTheme = !$('#theme-toggle').is(':checked');
-            const hoverTextColor = isDarkTheme ? 'white' : 'black';
-            
-            $.getJSON(url, function(data) {
-                const jugnoData = data.jugnotest;
-                
-                if (!jugnoData.values || jugnoData.values.length === 0) {
-                    // No data available
-                    Plotly.newPlot('historical-jugno-graph', [{
-                        x: [],
-                        y: [],
-                        type: 'scatter',
-                        mode: 'lines+markers'
-                    }], createHistoricalLayout());
-                    return;
-                }
-                
-                // Special case: If there's exactly one data point with value 0 and date "No Data",
-                // we'll still display it as a zero reading rather than "No Data"
-                const isZeroNoDataPoint = jugnoData.values.length === 1 && 
-                                         parseFloat(jugnoData.values[0]) === 0 && 
-                                         jugnoData.dates[0] === "No Data";
-                
-                if (isZeroNoDataPoint) {
-                    // Display zero data for the selected date range
-                    const midDate = new Date(
-                        (new Date(startDate).getTime() + new Date(endDate).getTime()) / 2
-                    ).toLocaleString();
-                    
-                    Plotly.newPlot('historical-jugno-graph', [{
-                        x: [midDate],
-                        y: [0],
-                        type: 'scatter',
-                        mode: 'markers',
-                        marker: {
-                            size: 10,
-                            color: 'gray'
-                        },
-                        hovertemplate: '0.00 cm<br>%{x}<extra></extra>'
-                    }], createHistoricalLayout());
-                    return;
-                }
-                
-                // Parse values to numbers
-                const values = jugnoData.values.map(v => parseFloat(v));
-                const dates = jugnoData.dates;
-                
-                // Limit data to 20 points for all graphs (newest data first)
-                let finalValues, finalDates;
-                if (values.length > 45) {
-                    // Take the newest 45 points
-                    finalValues = values.slice(-45);
-                    finalDates = dates.slice(-45);
-                } else {
-                    // Use all available points if fewer than 45
-                    finalValues = values;
-                    finalDates = dates;
-                }
-                
-                // Create a trace for each data point with its own color
-                const traces = [];
-                
-                for (let i = 0; i < finalValues.length; i++) {
-                    const value = finalValues[i];
-                    const color = getColor(value);
-                    const fillColor = getFillColor(color);
-                    
-                    traces.push({
-                        x: [finalDates[i]],
-                        y: [value.toFixed(2)],
-                        mode: 'markers',
-                        marker: {
-                            size: 10,
-                            color: color
-                        },
-                        showlegend: false,
-                        hoverinfo: 'x+y',
-                        hoverlabel: {
-                            font: {
-                                color: hoverTextColor
-                            },
-                            bgcolor: color,
-                            bordercolor: color
+                            }
                         },
                         hovertemplate: '%{y} cm<br>%{x}<extra></extra>'
                     });
@@ -598,14 +556,14 @@
                 }
                 
                 // Create layout
-                const layout = createHistoricalLayout();
+                const layout = createHistoricalLayout(isDarkTheme);
                 
-                // Set the xaxis range to show all 20 points
+                // Set the xaxis range to show all points
                 layout.xaxis.range = [finalDates[0], finalDates[finalDates.length - 1]];
                 layout.xaxis.autorange = false;
                 
                 // Plot the graph
-                Plotly.newPlot('historical-jugno-graph', traces, layout, {
+                Plotly.newPlot('historical-bayawan-graph', traces, layout, {
                     displayModeBar: true,
                     modeBarButtonsToRemove: [
                         'pan2d',
@@ -617,23 +575,21 @@
                         'hoverClosestCartesian',
                         'hoverCompareCartesian'
                     ],
-                    displaylogo: false,
-                    responsive: true
+                    displaylogo: false
                 });
             }).fail(function() {
-                console.error("Error fetching historical Jugno Creek data.");
+                console.error("Error fetching historical Bayawan data.");
             });
         }
         
-        function createHistoricalLayout() {
-            const isDarkTheme = !$('#theme-toggle').is(':checked');
+        function createHistoricalLayout(isDarkTheme = true) {
             const textColor = isDarkTheme ? 'white' : 'black';
             const bgColor = isDarkTheme ? 'black' : 'white';
             const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
             
             return {
                 title: {
-                    text: 'Historical Jugno Creek Water Level',
+                    text: 'Historical Bayawan Bridge Water Level',
                     font: { size: 18, color: textColor }
                 },
                 xaxis: {
@@ -664,7 +620,7 @@
         // Initial load
         $(document).ready(function() {
             // Check if theme preference exists in localStorage
-            const savedTheme = localStorage.getItem('jugnoTheme');
+            const savedTheme = localStorage.getItem('bayawanTheme');
             
             // If a preference exists, apply it
             if (savedTheme === 'light') {
@@ -673,7 +629,17 @@
                 $('#theme-toggle').prop('checked', false);
             }
             
-            updateJugnoGraph();
+            // Initial graph update with the saved theme
+            updateBayawanGraph();
+            
+            // Update the auto-refresh interval to 10 seconds for more frequent updates
+            setInterval(function() {
+                // Only auto-refresh the main graph if historical graph is not showing
+                if ($('.historical-graph-container').css('display') === 'none') {
+                    updateBayawanGraph();
+                    console.log("Auto-refreshed Bayawan Bridge water level data");
+                }
+            }, 10000); // 10000 ms = 10 seconds
             
             // Set default date values (today and 7 days ago)
             const today = new Date();
@@ -690,7 +656,7 @@
             
             // Set the input values in ISO format for the date picker
             $('#end-date').val(formatDate(today));
-            $('#start-date').val(formatDate(weekAgo));      
+            $('#start-date').val(formatDate(weekAgo));
             
             // Update button click handler - renamed to Generate Graph
             $('#update-graph').on('click', function() {
@@ -711,7 +677,7 @@
                 $('.historical-graph-container').show();
                 
                 // Update both current and historical graphs
-                updateJugnoGraph();
+                updateBayawanGraph();
                 updateHistoricalGraph(startDate, endDate);
             });
             
@@ -725,32 +691,20 @@
                 $('.historical-graph-container').hide();
                 
                 // Update current graph with default date range
-                updateJugnoGraph();
+                updateBayawanGraph();
             });
-            
-            // Initially hide the historical graph container when page loads
-            $('.historical-graph-container').hide();
-            
-            // Update the auto-refresh interval to 10 seconds for more frequent updates
-            setInterval(function() {
-                // Only auto-refresh the main graph if historical graph is not showing
-                if ($('.historical-graph-container').css('display') === 'none') {
-                    updateJugnoGraph();
-                    console.log("Auto-refreshed Jugno Creek water level data");
-                }
-            }, 60000); // 10000 ms = 10 secondsss
             
             // Theme toggle handler
             $('#theme-toggle').on('change', function() {
                 // Save theme preference to localStorage
                 if ($(this).is(':checked')) {
-                    localStorage.setItem('jugnoTheme', 'light');
+                    localStorage.setItem('bayawanTheme', 'light');
                 } else {
-                    localStorage.setItem('jugnoTheme', 'dark');
+                    localStorage.setItem('bayawanTheme', 'dark');
                 }
                 
                 // Update both graphs with the new theme
-                updateJugnoGraph();
+                updateBayawanGraph();
                 
                 // Update historical graph if it's visible
                 if ($('.historical-graph-container').is(':visible')) {
@@ -759,6 +713,9 @@
                     updateHistoricalGraph(startDate, endDate);
                 }
             });
+            
+            // Initially hide the historical graph container when page loads
+            $('.historical-graph-container').hide();
         });
     </script>
 

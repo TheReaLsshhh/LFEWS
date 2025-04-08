@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modbus Data Dashboard</title>
+    <title>Water Level Dashboard</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
@@ -44,13 +44,15 @@
             padding: 20px;
             width: calc(100% - 220px);
             min-width: 0;
-            overflow-x: auto;
+            /* overflow-x: auto; */
             position: relative;
             z-index: 1;
         }
 
         .banner {
-            width: 1500px;
+            /* width: 1500px; */
+            width: 100%;
+            max-width: 1500px;
             max-height: 140px;
             text-align: center;
             margin-top: -10px;
@@ -63,7 +65,7 @@
         }
 
         .header {
-            background-color: #141414;
+            background-color: transparent;
             width: 100%;
             padding: 12px 20px;
             text-align: center;
@@ -73,7 +75,7 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            margin-top: -15px;
+            /* margin-top: -5px; */
             margin-bottom: -10px;
         }
 
@@ -342,66 +344,261 @@
             return 'red';
         }
         
+
+        let currentHistoricalIndex = 0;
+        let historicalData = null;
+        let historicalDates = [];
+
         function refreshGraphs(startDate = null, endDate = null) {
-            // First, get current data for the top graphs (always show current data)
-            let currentUrl = "{% url 'dashboard' %}?ajax=1";
+    // First, get current data for the top graphs (always show current data)
+    let currentUrl = "{% url 'dashboard' %}?ajax=1";
+    
+    $.getJSON(currentUrl, function(currentData) {
+        const thresholds = {
+            graph1: [
+                { max: 90.99, color: 'green' },
+                { max: 120.99, color: 'yellow' },
+                { max: 169.99, color: 'orange' }
+            ],
+            graph2: [
+                { max: 269.99, color: 'green' },
+                { max: 369.99, color: 'yellow' },
+                { max: 435.99, color: 'orange' }
+            ],
+            graph3: [
+                { max: 77.59, color: 'green' },
+                { max: 124.99, color: 'yellow' },
+                { max: 169.99, color: 'orange' }
+            ],
+            graph4: [
+                { max: 209.99, color: 'green' },
+                { max: 309.99, color: 'yellow' },
+                { max: 409.99, color: 'orange' }
+            ]
+        };
+        
+        // Create traces with the current data for top graphs
+        updateGraph("graph1", currentData.bywntest, thresholds.graph1, "Bayawan Bridge");
+        updateGraph("graph2", currentData.canalumtest, thresholds.graph2, "Kalumbuyan Bridge");
+        updateGraph("graph3", currentData.kalumbuyantest, thresholds.graph3, "Canalum Creek");
+        updateGraph("graph4", currentData.jugnotest, thresholds.graph4, "Jugno Creek");
+        
+        // If date range is provided, get historical data for bottom graphs
+        if (startDate && endDate) {
+            let historicalUrl = `{% url 'dashboard' %}?ajax=1&start_date=${startDate}&end_date=${endDate}`;
             
-            $.getJSON(currentUrl, function(currentData) {
-                const thresholds = {
-                    graph1: [
-                        { max: 90.99, color: 'green' },
-                        { max: 120.99, color: 'yellow' },
-                        { max: 169.99, color: 'orange' }
-                    ],
-                    graph2: [
-                        { max: 269.99, color: 'green' },
-                        { max: 369.99, color: 'yellow' },
-                        { max: 435.99, color: 'orange' }
-                    ],
-                    graph3: [
-                        { max: 77.59, color: 'green' },
-                        { max: 124.99, color: 'yellow' },
-                        { max: 169.99, color: 'orange' }
-                    ],
-                    graph4: [
-                        { max: 209.99, color: 'green' },
-                        { max: 309.99, color: 'yellow' },
-                        { max: 409.99, color: 'orange' }
-                    ]
-                };
-                
-                // Create traces with the current data for top graphs
-                updateGraph("graph1", currentData.bywntest, thresholds.graph1, "Bayawan Bridge");
-                updateGraph("graph2", currentData.canalumtest, thresholds.graph2, "Canalum Creek");
-                updateGraph("graph3", currentData.kalumbuyantest, thresholds.graph3, "Kalumbuyan Bridge");
-                updateGraph("graph4", currentData.jugnotest, thresholds.graph4, "Jugno Creek");
-                
-                // If date range is provided, get historical data for bottom graphs
+            $.getJSON(historicalUrl, function(historicalData) {
+                updateGraph("graph6", historicalData.bywntest, thresholds.graph1, "Historical Bayawan Bridge");
+                updateGraph("graph7", historicalData.canalumtest, thresholds.graph2, "Historical Kalumbuyan Bridge");
+                updateGraph("graph8", historicalData.kalumbuyantest, thresholds.graph3, "Historical Canalum Creek");
+                updateGraph("graph9", historicalData.jugnotest, thresholds.graph4, "Historical Jugno Creek");
+
                 if (startDate && endDate) {
                     let historicalUrl = `{% url 'dashboard' %}?ajax=1&start_date=${startDate}&end_date=${endDate}`;
-                    
-                    $.getJSON(historicalUrl, function(historicalData) {
-                        updateGraph("graph6", historicalData.bywntest, thresholds.graph1, "Historical Bayawan Bridge");
-                        updateGraph("graph7", historicalData.canalumtest, thresholds.graph2, "Historical Canalum Creek");
-                        updateGraph("graph8", historicalData.kalumbuyantest, thresholds.graph3, "Historical Kalumbuyan Bridge");
-                        updateGraph("graph9", historicalData.jugnotest, thresholds.graph4, "Historical Jugno Creek");
+
+                    $.getJSON(historicalUrl, function(historicalResponse) {
+                        historicalData = historicalResponse;
+                        historicalDates = [];
+                        
+                        // Collect all unique dates from the historical data
+                        const allDates = [
+                            ...new Set([
+                                ...historicalData.bywntest.dates,
+                                ...historicalData.canalumtest.dates,
+                                ...historicalData.kalumbuyantest.dates,
+                                ...historicalData.jugnotest.dates
+                            ])
+                        ].sort();
+
+                        // Convert to Date objects and sort
+                        historicalDates = allDates.map(d => new Date(d)).sort((a, b) => a - b);
+                        
+                        // Show the first segment of data
+                        currentHistoricalIndex = 0;
+                        updateHistoricalGraphs();
+                        
+                        // Show navigation controls
+                        $('.historical-nav').show();
+                        
                     }).fail(function() {
                         console.error("Error fetching historical data.");
                     });
                 }
-                
-                console.log("Graphs updated successfully.");
+
             }).fail(function() {
-                console.error("Error refreshing graph data.");
+                console.error("Error fetching historical data.");
             });
         }
+        
+        console.log("Graphs updated successfully.");
+    }).fail(function() {
+        console.error("Error refreshing graph data.");
+    });
+}
+
+
+function historicalGraphs() {
+    const startDate = $('#start-date').val();
+    const endDate = $('#end-date').val();
+    
+    if (!startDate || !endDate) {
+        return;
+    }
+
+    const thresholds = {
+        graph6: [
+            { max: 90.99, color: 'green' },
+            { max: 120.99, color: 'yellow' },
+            { max: 169.99, color: 'orange' }
+        ],
+        graph7: [
+            { max: 269.99, color: 'green' },
+            { max: 369.99, color: 'yellow' },
+            { max: 435.99, color: 'orange' }
+        ],
+        graph8: [
+            { max: 77.59, color: 'green' },
+            { max: 124.99, color: 'yellow' },
+            { max: 169.99, color: 'orange' }
+        ],
+        graph9: [
+            { max: 209.99, color: 'green' },
+            { max: 309.99, color: 'yellow' },
+            { max: 409.99, color: 'orange' }
+        ]
+    };
+
+    // Fetch historical data
+    let historicalUrl = `{% url 'dashboard' %}?ajax=1&start_date=${startDate}&end_date=${endDate}`;
+    
+    $.getJSON(historicalUrl, function(historicalData) {
+        // Update each historical graph
+        updateHistoricalGraph("graph6", historicalData.bywntest, thresholds.graph6, "Historical Bayawan Bridge");
+        updateHistoricalGraph("graph7", historicalData.canalumtest, thresholds.graph7, "Historical Canalum Creek");
+        updateHistoricalGraph("graph8", historicalData.kalumbuyantest, thresholds.graph8, "Historical Kalumbuyan Bridge");
+        updateHistoricalGraph("graph9", historicalData.jugnotest, thresholds.graph9, "Historical Jugno Creek");
+    });
+}
+
+function updateHistoricalGraph(graphId, data, thresholds, title) {
+    if (!data || !data.values || data.values.length === 0) {
+        Plotly.newPlot(graphId, [{
+            x: [],
+            y: [],
+            type: 'scatter',
+            mode: 'lines+markers'
+        }], {
+            ...createLayout(title, graphId),
+            annotations: [{
+                text: 'No Historical Data Available',
+                showarrow: false,
+                font: { color: 'white', size: 16 },
+                x: 0.5,
+                y: 0.5,
+                xref: 'paper',
+                yref: 'paper'
+            }]
+        });
+        return;
+    }
+
+    const values = data.values.map(v => parseFloat(v));
+    const dates = data.dates;
+    const traces = [];
+
+    // Create traces with gradient fill
+    for (let i = 0; i < values.length; i++) {
+        const value = values[i];
+        const color = getColor(value, thresholds);
+        const fillColor = getFillColor(color);
+
+        // Add markers
+        traces.push({
+            x: [dates[i]],
+            y: [value.toFixed(2)],
+            mode: 'markers',
+            marker: {
+                size: 6,
+                color: color,
+                line: {
+                    color: 'white',
+                    width: 1
+                }
+            },
+            showlegend: false,
+            hoverinfo: 'x+y',
+            hovertemplate: '%{y} cm<br>%{x}<extra></extra>'
+        });
+
+        // Add line segments with gradient fill
+        if (i > 0) {
+            traces.push({
+                x: [dates[i-1], dates[i]],
+                y: [values[i-1].toFixed(2), value.toFixed(2)],
+                mode: 'lines',
+                line: {
+                    color: color,
+                    width: 2,
+                    shape: 'spline'
+                },
+                fill: 'tozeroy',
+                fillcolor: fillColor,
+                showlegend: false,
+                hoverinfo: 'none'
+            });
+        }
+    }
+
+    // Enhanced layout for historical graphs
+    const layout = {
+        ...createLayout(title, graphId),
+        xaxis: {
+            type: 'date',
+            tickfont: { color: 'white', size: 10 },
+            rangeslider: {
+                visible: true,
+                thickness: 0.1,
+                bgcolor: 'rgba(0,0,0,0.3)',
+                bordercolor: '#76e095'
+            },
+            gridcolor: 'rgba(255, 255, 255, 0.1)'
+        },
+        yaxis: {
+            tickfont: { color: 'white', size: 10 },
+            gridcolor: 'rgba(255, 255, 255, 0.1)',
+            zerolinecolor: 'rgba(255, 255, 255, 0.2)'
+        },
+        margin: { l: 50, r: 20, t: 40, b: 60 },
+        paper_bgcolor: 'rgba(0,0,0,0.3)',
+        plot_bgcolor: 'rgba(0,0,0,0.2)',
+        hoverlabel: {
+            bgcolor: '#333',
+            font: { color: 'white' }
+        }
+    };
+
+    // Plot with enhanced configuration
+    Plotly.newPlot(graphId, traces, layout, {
+        displayModeBar: true,
+        modeBarButtonsToRemove: [
+            'pan2d',
+            'select2d',
+            'lasso2d',
+            'resetScale2d',
+            'toImage'
+        ],
+        scrollZoom: true,
+        displaylogo: false,
+        responsive: true
+    });
+}
         
         function updateGraph(graphId, data, thresholds, title) {
             // Create a default layout first
             const layout = createLayout(title, graphId);
             
             // Check if data is valid
-            if (!data || !data.values || data.values.length === 0 || (data.values.length === 1 && data.values[0] === 0 && data.dates[0] === "No Data")) {
+            if (!data || !data.values || data.values.length === 0) {
                 // No data available - show empty graph with "No Data" message
                 Plotly.newPlot(graphId, [{
                     x: [],
@@ -422,14 +619,12 @@
                 });
                 return;
             }
-            
-            // Parse values to numbers
+
+            // Create traces with the data
             const values = data.values.map(v => parseFloat(v));
             const dates = data.dates;
-            
-            // Get the color for each data point
             const colors = values.map(v => getColor(v, thresholds));
-            
+
             // Create a trace for each data point with its own color
             const traces = [];
             
@@ -443,11 +638,12 @@
                     y: [value.toFixed(2)],
                     mode: 'markers',
                     marker: {
-                        size: 8,
+                        size: 4,
                         color: color
                     },
                     showlegend: false,
-                    hoverinfo: 'x+y'
+                    hoverinfo: 'x+y',
+                    hovertemplate: '%{y} cm<br>%{x}<extra></extra>'
                 });
                 
                 // Add a line segment if this isn't the first point
@@ -468,16 +664,17 @@
                 }
             }
             
-            // Set the xaxis range to show only the last 15 points by default
-            if (dates.length > 15) {
-                layout.xaxis.range = [
-                    dates[dates.length - 15],
-                    dates[dates.length - 1]
-                ];
-                layout.xaxis.autorange = false;
+            // Update layout for historical graphs
+            if (graphId.startsWith('graph6') || graphId.startsWith('graph7') || 
+                graphId.startsWith('graph8') || graphId.startsWith('graph9')) {
+                layout.xaxis.rangeslider = {
+                    visible: true,
+                    thickness: 0.1
+                };
+                layout.margin.b = 60; // Increase bottom margin for rangeslider
             }
             
-            // Plot the graph
+            // Plot the graph with updated configuration
             Plotly.newPlot(graphId, traces, layout, {
                 displayModeBar: true,
                 modeBarButtonsToRemove: [
@@ -490,6 +687,7 @@
                     'hoverClosestCartesian',
                     'hoverCompareCartesian'
                 ],
+                scrollZoom: true,  // Enable scroll zoom
                 displaylogo: false
             });
         }
@@ -506,47 +704,53 @@
         }
         
         function createLayout(title, graphId) {
-            // Determine if this is a historical graph
-            const isHistorical = graphId.startsWith('graph6') || 
-                                graphId.startsWith('graph7') || 
-                                graphId.startsWith('graph8') || 
-                                graphId.startsWith('graph9');
-            
-            // Set y-axis range based on graph ID
-            let yRange;
-            if (graphId === 'graph1' || graphId === 'graph3' || graphId === 'graph6' || graphId === 'graph8') {
-                yRange = [0, 200]; // Bayawan and Kalumbuyan
-            } else {
-                yRange = [0, 500]; // Canalum and Jugno
-            }
-            
-            return {
-                width: 600,
-                height: 260,
-                title: {
-                    text: title,
-                    font: { size: 14, color: 'white' },
-                    y: 0.95
-                },
-                xaxis: {
-                    type: 'date',
-                    tickfont: { color: 'white', size: 9 }
-                },
-                yaxis: {
-                    range: yRange,
-                    tickformat: ".2f",
-                    tickfont: { color: 'white', size: 7 },
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    gridwidth: 1
-                },
-                margin: { l: 40, r: 20, t: 30, b: 40 },
-                paper_bgcolor: 'black',
-                plot_bgcolor: 'black',
-                font: { color: 'white' },
-                showlegend: false,
-                hovermode: 'far'
-            };
+        // Determine if this is a historical graph
+        const isHistorical = graphId.startsWith('graph6') || 
+                            graphId.startsWith('graph7') || 
+                            graphId.startsWith('graph8') || 
+                            graphId.startsWith('graph9');
+        
+        // Set y-axis range based on graph ID
+        let yRange;
+        if (graphId === 'graph1' || graphId === 'graph3' || graphId === 'graph6' || graphId === 'graph8') {
+            yRange = [0, 200]; // Bayawan and Kalumbuyan
+        } else {
+            yRange = [0, 500]; // Canalum and Jugno
         }
+        
+        // Calculate the time range for the last 30 minutes
+        const now = new Date();
+        const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60000);
+        
+        return {
+            width: 600,
+            height: 260,
+            title: {
+                text: title,
+                font: { size: 14, color: 'white' },
+                y: 0.95
+            },
+            xaxis: {
+                type: 'date',
+                tickfont: { color: 'white', size: 9 },
+                range: isHistorical ? undefined : [thirtyMinutesAgo, now], // Set range only for current graphs
+                autorange: isHistorical // Allow autorange for historical graphs
+            },
+            yaxis: {
+                range: yRange,
+                tickformat: ".2f",
+                tickfont: { color: 'white', size: 7 },
+                gridcolor: 'rgba(255, 255, 255, 0.1)',
+                gridwidth: 1
+            },
+            margin: { l: 40, r: 20, t: 30, b: 40 },
+            paper_bgcolor: 'black',
+            plot_bgcolor: 'black',
+            font: { color: 'white' },
+            showlegend: false,
+            hovermode: 'far'
+        };
+    }
         
         // Initial load and periodic refresh
         $(document).ready(function() {
@@ -579,6 +783,13 @@
             
             // Show historical graphs container if it was hidden
             $('.historical-container').show();
+            
+            // Add loading indicator
+            // $('.graph').each(function() {
+            //     if ($(this).find('.loading-indicator').length === 0) {
+            //         $(this).append('<div class="loading-indicator">Loading...</div>');
+            //     }
+            // });
             
             refreshGraphs(startDate, endDate);
         });
